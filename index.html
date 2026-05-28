@@ -3,76 +3,123 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>טוטו אנליזר AI</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<title>וינר 16 — אנליזר AI</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:#f8f8fc;color:#1a1a2e;font-family:'Segoe UI',system-ui,sans-serif;direction:rtl;min-height:100vh;}
-input,select,button{font-family:inherit;}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-#root{min-height:100vh;}
+body{background:#f8f8fc;color:#1a1a2e;font-family:system-ui,sans-serif;direction:rtl;min-height:100vh;}
+.topbar{background:#fff;border-bottom:1px solid #e8e8f0;padding:14px 16px;position:sticky;top:0;z-index:100;}
+.topbar-inner{max-width:600px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;}
+.logo{display:flex;align-items:center;gap:9px;}
+.logo-icon{width:34px;height:34px;border-radius:10px;background:#534AB7;display:flex;align-items:center;justify-content:center;font-size:17px;}
+.logo-title{font-size:16px;font-weight:600;}
+.logo-sub{font-size:9px;color:#534AB7;font-weight:500;letter-spacing:1px;}
+.tabs{display:flex;border-bottom:1px solid #e8e8f0;max-width:600px;margin:0 auto;}
+.tab{flex:1;padding:11px 4px;border:none;border-bottom:2px solid transparent;background:transparent;color:#aaa;font-size:11px;cursor:pointer;}
+.tab.active{color:#534AB7;border-bottom-color:#534AB7;font-weight:500;}
+.content{max-width:600px;margin:0 auto;padding:13px 14px 100px;}
+.card{background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;border:1px solid #e8e8f0;}
+.btn{padding:10px 18px;border-radius:10px;border:none;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-primary{background:#534AB7;color:#fff;width:100%;padding:14px;}
+.btn-sm{background:#EEEDFE;color:#534AB7;padding:7px 14px;border-radius:20px;border:none;cursor:pointer;font-size:11px;font-weight:500;}
+input,select,textarea{font-family:inherit;direction:rtl;outline:none;}
+.inp{width:100%;padding:9px 11px;border-radius:9px;border:1px solid #e0e0e0;background:#fafafa;font-size:12px;color:#1a1a2e;}
+.inp:focus{border-color:#AFA9EC;}
+.select{width:100%;padding:9px 11px;border-radius:9px;border:1px solid #e0e0e0;background:#fafafa;font-size:12px;color:#1a1a2e;}
+.badge-1{background:#E1F5EE;color:#1D9E75;border:1px solid #9FE1CB;}
+.badge-x{background:#FAEEDA;color:#BA7517;border:1px solid #FAC775;}
+.badge-2{background:#FCEBEB;color:#A32D2D;border:1px solid #F7C1C1;}
+.badge{width:24px;height:24px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;}
+.pct-bar{height:4px;border-radius:2px;background:#f0f0f0;overflow:hidden;margin:3px 0 4px;}
+.appnest-badge{margin:16px 0 0;padding:11px 14px;background:rgba(212,168,83,0.08);border:1px solid rgba(212,168,83,0.2);border-radius:12px;}
+.appnest-badge a{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.loading-overlay{position:fixed;inset:0;background:#f8f8fc;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.spinner{font-size:48px;animation:spin 2s linear infinite;}
 </style>
 </head>
 <body>
-<div id="root"></div>
-<script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
-<script type="text/babel">
-const {useState, useEffect} = React;
 
-// ── Storage ──────────────────────────────────────────────────
-function loadHistory(){try{const r=localStorage.getItem('toto_h');return r?JSON.parse(r):[]}catch{return[]}}
-function saveHistory(h){try{localStorage.setItem('toto_h',JSON.stringify(h))}catch{}}
-function loadMode(){try{return localStorage.getItem('toto_mode')}catch{return null}}
-function saveMode(m){try{localStorage.setItem('toto_mode',m)}catch{}}
+<div class="topbar">
+  <div class="topbar-inner">
+    <div class="logo">
+      <div class="logo-icon">⚽</div>
+      <div>
+        <div class="logo-title">וינר 16 — אנליזר</div>
+        <div class="logo-sub">BSD API · נתונים אמיתיים</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <button class="btn-sm" onclick="showHistory()">📚</button>
+      <button class="btn-sm" onclick="showEnter()">+ טופס</button>
+      <div style="text-align:center;">
+        <div style="font-size:8px;color:#aaa;">מילאתי</div>
+        <div style="font-size:17px;font-weight:500;color:#534AB7;" id="picks-count">0<span style="font-size:10px;color:#aaa;" id="picks-total">/0</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('form',this)">📋 טופס</button>
+    <button class="tab" onclick="switchTab('ai',this)">🤖 ניתוח</button>
+    <button class="tab" onclick="switchTab('rows',this)">✨ שורות</button>
+    <button class="tab" onclick="switchTab('picks',this)">✏️ שלי</button>
+  </div>
+</div>
 
-// ── Prediction Engine ─────────────────────────────────────────
-function formScore(form){
-  if(!form?.length)return 0.5;
-  const w=[0.35,0.25,0.2,0.12,0.08];let s=0;
-  form.forEach((r,i)=>{const wt=w[i]||0.05;s+=r===1?wt:r===2?wt*0.4:0});
-  return Math.min(1,s/0.7);
-}
-function predict(hs,as_){
-  const D={wins:40,draws:20,losses:40,form:[0,1,0,1,0],position:8,goalsFor:1.2,goalsAgainst:1.4};
-  const h={...D,...(hs||{})},a={...D,...(as_||{})};
-  const ht=h.wins+h.draws+h.losses||1,at=a.wins+a.draws+a.losses||1;
-  const elo=1/(1+Math.pow(10,-((16-(h.position||8))*40-(16-(a.position||8))*40)/400));
-  const hS=(h.wins/ht)*0.25+formScore(h.form)*0.2+elo*0.25+(h.goalsFor/1.5)*0.1+(1-h.goalsAgainst/2.5)*0.1+0.12;
-  const aS=(a.wins/at)*0.25+formScore(a.form)*0.2+(1-elo)*0.25+(a.goalsFor/1.5)*0.1+(1-a.goalsAgainst/2.5)*0.1;
-  const dF=((h.draws/ht+a.draws/at)/2)*0.85;
-  const tot=hS+aS+dF||1;
-  const win=Math.round(hS/tot*100),loss=Math.round(aS/tot*100),draw=100-win-loss;
-  const max=Math.max(win,draw,loss);
-  const pred=win>=draw&&win>=loss?'1':draw>=win&&draw>=loss?'X':'2';
-  const sorted=[{v:win,l:'1'},{v:draw,l:'X'},{v:loss,l:'2'}].sort((a,b)=>b.v-a.v);
-  return{win,draw,loss,pred,max,surprise:sorted[1].v>=26?sorted[1].l:sorted[2].l,
-    conf:max>55?'גבוהה':max>42?'בינונית':'נמוכה',confColor:max>55?'#1D9E75':max>42?'#BA7517':'#A32D2D',
-    hForm:h.form,aForm:a.form,hPos:h.position,aPos:a.position,hGf:h.goalsFor,aGf:a.goalsFor};
-}
+<!-- Loading -->
+<div class="loading-overlay" id="loading" style="display:none;">
+  <div class="spinner">⚙️</div>
+  <div style="font-size:15px;font-weight:500;color:#534AB7;margin:14px 0 6px;" id="loading-title">מנתח...</div>
+  <div style="font-size:12px;color:#aaa;" id="loading-step">מחפש נתונים...</div>
+</div>
 
-// ── AI ────────────────────────────────────────────────────────
-async function callClaude(prompt){
-  const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
-      tools:[{type:'web_search_20250305',name:'web_search'}],
-      messages:[{role:'user',content:prompt}]})});
-  const d=await res.json();
-  return d.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
-}
-async function fetchWeeklyGames(){
-  const text=await callClaude(`Search toto.co.il for this week's Israeli Toto 16 matches. Return ONLY JSON array no markdown:
-[{"home":"קבוצה","away":"קבוצה","league":"ליגה"}] with all 16 matches in Hebrew.`);
-  const m=text.match(/\[[\s\S]*?\]/);
-  if(m){const arr=JSON.parse(m[0]);if(Array.isArray(arr)&&arr.length>=10)return arr.slice(0,16).map((g,i)=>({id:i+1,...g}))}
-  return null;
-}
-// ── BSD API ───────────────────────────────────────────────────
+<div class="content" id="main-content">
+  <!-- נמלא דינמית -->
+</div>
+
+<div id="bottom-bar" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(0,#f8f8fc 55%,transparent);padding:10px 14px 16px;display:none;">
+  <div style="max-width:600px;margin:0 auto;">
+    <div style="background:#fff;border-radius:10px;padding:8px 12px;border:1px solid #e8e8f0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:9px;color:#aaa;">🛡️ שורה בטוחה:</div>
+      <div id="safe-row-preview" style="display:flex;gap:2px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────
 const BSD_TOKEN = '1bb3564fb8f33337674cc7d17082f50e914148cb';
 const BSD = 'https://sports.bzzoiro.com/api';
 
+// ── State ─────────────────────────────────────────────────────
+let state = {
+  screen: 'enter', // enter | main | history
+  tab: 'form',
+  games: [],
+  preds: {},
+  picks: {},
+  history: JSON.parse(localStorage.getItem('w16_history')||'[]'),
+  autoMode: null
+};
+
+// ── Utils ─────────────────────────────────────────────────────
+const VC = v => v==='1'?'#1D9E75':v==='X'?'#BA7517':'#A32D2D';
+const VB = v => v==='1'?'#E1F5EE':v==='X'?'#FAEEDA':'#FCEBEB';
+const VBC = v => v==='1'?'badge-1':v==='X'?'badge-x':'badge-2';
+
+function badge(v,size=22){
+  return `<span class="badge ${VBC(v)}" style="width:${size}px;height:${size}px;">${v}</span>`;
+}
+
+function showLoading(title,step){
+  document.getElementById('loading').style.display='flex';
+  document.getElementById('loading-title').textContent=title||'טוען...';
+  document.getElementById('loading-step').textContent=step||'';
+}
+function hideLoading(){document.getElementById('loading').style.display='none';}
+
+function saveHistory(){localStorage.setItem('w16_history',JSON.stringify(state.history));}
+
+// ── BSD API ───────────────────────────────────────────────────
 async function bsdGet(path){
   try{
     const r=await fetch(BSD+path,{headers:{'Authorization':'Token '+BSD_TOKEN}});
@@ -81,603 +128,579 @@ async function bsdGet(path){
   }catch{return null;}
 }
 
-// מילון תרגום עברית→אנגלית לקבוצות נפוצות
 const HE_EN={
-  'מכבי תל אביב':'Maccabi Tel Aviv','הפועל תל אביב':'Hapoel Tel Aviv',
-  'מכבי חיפה':'Maccabi Haifa','הפועל חיפה':'Hapoel Haifa',
-  'בני סכנין':'Bnei Sakhnin','מכבי פתח תקווה':'Maccabi Petah Tikva',
-  'הפועל באר שבע':'Hapoel Beer Sheva','בית"ר ירושלים':'Beitar Jerusalem',
-  'מכבי נתניה':'Maccabi Netanya','הפועל ירושלים':'Hapoel Jerusalem',
-  'ליוורפול':'Liverpool','ברצלונה':'Barcelona','ריאל מדריד':'Real Madrid',
-  "מנצ'סטר סיטי":'Manchester City',"מנצ'סטר יונייטד":'Manchester United',
-  "צ'לסי":'Chelsea','ארסנל':'Arsenal','טוטנהאם':'Tottenham',
-  'ביירן מינכן':'Bayern Munich','בורוסיה דורטמונד':'Borussia Dortmund',
-  'יובנטוס':'Juventus','אינטר מילאן':'Inter Milan','מילאן':'AC Milan',
-  'נאפולי':'Napoli','רומא':'AS Roma','לאציו':'Lazio',
-  'פריז סן ז'רמן':'Paris Saint-Germain','אטלטיקו מדריד':'Atletico Madrid',
-  'סביליה':'Sevilla','ולנסיה':'Valencia','וייארל':'Villarreal',
-  'ניוקאסל':'Newcastle','אסטון וילה':'Aston Villa','ווסטהאם':'West Ham',
-  'אייאקס':'Ajax','פורטו':'Porto','בנפיקה':'Benfica',
-  'לייפציג':'RB Leipzig','לאוורקוזן':'Bayer Leverkusen',
+  "מכבי תל אביב":"Maccabi Tel Aviv","הפועל תל אביב":"Hapoel Tel Aviv",
+  "מכבי חיפה":"Maccabi Haifa","הפועל חיפה":"Hapoel Haifa",
+  "בני סכנין":"Bnei Sakhnin","מכבי פתח תקווה":"Maccabi Petah Tikva",
+  "הפועל באר שבע":"Hapoel Beer Sheva","ביתר ירושלים":"Beitar Jerusalem",
+  "מכבי נתניה":"Maccabi Netanya","הפועל ירושלים":"Hapoel Jerusalem",
+  "מנצ'סטר סיטי":"Manchester City","מנצ'סטר יונייטד":"Manchester United",
+  "ליוורפול":"Liverpool","ארסנל":"Arsenal","טוטנהאם":"Tottenham",
+  "צ'לסי":"Chelsea","ביירן מינכן":"Bayern Munich","ברצלונה":"Barcelona",
+  "ריאל מדריד":"Real Madrid","אטלטיקו מדריד":"Atletico Madrid",
+  "יובנטוס":"Juventus","אינטר מילאן":"Inter Milan","מילאן":"AC Milan",
+  "נאפולי":"Napoli","רומא":"AS Roma","לאציו":"Lazio",
+  "בורוסיה דורטמונד":"Borussia Dortmund","לייפציג":"RB Leipzig",
+  "לאוורקוזן":"Bayer Leverkusen","אייאקס":"Ajax","פורטו":"Porto",
+  "בנפיקה":"Benfica","סביליה":"Sevilla","ולנסיה":"Valencia",
+  "ניוקאסל":"Newcastle","אסטון וילה":"Aston Villa","ווסטהאם":"West Ham",
+  "פריז סן ז'רמן":"Paris Saint-Germain","וייארל":"Villarreal"
 };
 
-async function findTeamId(name){
-  // נסה עברית ישירות, ואז תרגום, ואז חיפוש
-  const queries=[name, HE_EN[name]||'', ...name.split(' ')].filter(Boolean);
+async function findTeam(name){
+  const queries = [name, HE_EN[name]||''];
+  // הוסף גם את המילה הראשונה
+  const words = (HE_EN[name]||name).split(' ');
+  if(words.length>1) queries.push(words[0]);
   for(const q of queries){
-    if(q.length<2)continue;
-    const d=await bsdGet('/teams/?search='+encodeURIComponent(q)+'&limit=5');
+    if(!q||q.length<2) continue;
+    const d = await bsdGet('/teams/?search='+encodeURIComponent(q)+'&limit=5');
     if(d?.results?.length){
-      // מצא קבוצה הכי קרובה לשם
-      const found=d.results.find(t=>
-        t.name.toLowerCase().includes(q.toLowerCase())||
-        q.toLowerCase().includes(t.name.toLowerCase().split(' ')[0])
-      )||d.results[0];
-      return found;
+      return d.results.find(t=>
+        t.name.toLowerCase().includes(q.toLowerCase().split(' ')[0])
+      ) || d.results[0];
     }
   }
   return null;
 }
 
-async function fetchStats(name,league){
+async function fetchTeamStats(name, league){
   try{
-    const team=await findTeamId(name);
-    if(!team)return null;
-
-    // שלוף 15 משחקים אחרונים
-    const ev=await bsdGet('/events/?team='+team.id+'&status=finished&limit=15&ordering=-event_date');
-    if(!ev?.results?.length)return null;
-
+    const team = await findTeam(name);
+    if(!team) return null;
+    const ev = await bsdGet('/events/?team='+team.id+'&status=finished&limit=15&ordering=-event_date');
+    if(!ev?.results?.length) return null;
     let wins=0,draws=0,losses=0,gf=0,ga=0;
     const form=[];
     for(const m of ev.results){
-      const isHome=String(m.home_team_id)===String(team.id)||m.home_team===team.name;
-      const hs=Number(m.home_score)||0,as=Number(m.away_score)||0;
-      const mg=isHome?hs:as,og=isHome?as:hs;
-      gf+=mg;ga+=og;
+      const isHome = String(m.home_team_id)===String(team.id);
+      const hs=Number(m.home_score)||0, as=Number(m.away_score)||0;
+      const mg=isHome?hs:as, og=isHome?as:hs;
+      gf+=mg; ga+=og;
       if(mg>og){wins++;if(form.length<5)form.push(1);}
       else if(mg===og){draws++;if(form.length<5)form.push(2);}
       else{losses++;if(form.length<5)form.push(0);}
     }
     const tot=wins+draws+losses||1;
-
-    // נסה לשלוף מיקום בטבלה
     let position=10;
     try{
       const st=await bsdGet('/standings/?team='+team.id+'&limit=1&ordering=-season');
-      if(st?.results?.[0]?.position)position=st.results[0].position;
+      if(st?.results?.[0]?.position) position=st.results[0].position;
     }catch{}
-
     return{wins,draws,losses,position,
       goalsFor:parseFloat((gf/tot).toFixed(2)),
       goalsAgainst:parseFloat((ga/tot).toFixed(2)),
-      form:form.slice(0,5)};
-  }catch(e){
-    console.warn('BSD error for',name,e);
-    return null;
-  }
+      form:form.slice(0,5),teamName:team.name};
+  }catch(e){return null;}
 }
 
-// ── Utils ─────────────────────────────────────────────────────
-const VC=v=>v==='1'?'#1D9E75':v==='X'?'#BA7517':'#A32D2D';
-const VB=v=>v==='1'?'#E1F5EE':v==='X'?'#FAEEDA':'#FCEBEB';
-const fmtD=d=>{const dt=new Date(d);return`${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()}`};
-function buildRow(mode,preds,games){
-  return games.map(g=>{
-    const p=preds[g.id];if(!p)return'?';
-    if(mode==='safe')return p.pred;
-    if(mode==='surprise')return p.surprise;
-    return p.max<50?[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].sort((a,b)=>b.v-a.v)[1].l:p.pred;
+// ── Prediction Engine ─────────────────────────────────────────
+function formScore(form){
+  if(!form||!form.length) return 0.5;
+  const w=[0.35,0.25,0.2,0.12,0.08];
+  let s=0;
+  form.forEach((r,i)=>{const wt=w[i]||0.05;s+=r===1?wt:r===2?wt*0.4:0;});
+  return Math.min(1,s/0.7);
+}
+
+function predictMatch(hs,as_){
+  const D={wins:40,draws:20,losses:40,form:[0,1,0,1,0],position:8,goalsFor:1.2,goalsAgainst:1.4};
+  const h={...D,...(hs||{})}, a={...D,...(as_||{})};
+  const ht=h.wins+h.draws+h.losses||1, at=a.wins+a.draws+a.losses||1;
+  const elo=1/(1+Math.pow(10,-((16-(h.position||8))*40-(16-(a.position||8))*40)/400));
+  const hS=(h.wins/ht)*0.25+formScore(h.form)*0.2+elo*0.25+(h.goalsFor/1.5)*0.1+(1-h.goalsAgainst/2.5)*0.1+0.12;
+  const aS=(a.wins/at)*0.25+formScore(a.form)*0.2+(1-elo)*0.25+(a.goalsFor/1.5)*0.1+(1-a.goalsAgainst/2.5)*0.1;
+  const dF=((h.draws/ht+a.draws/at)/2)*0.85;
+  const tot=hS+aS+dF||1;
+  const win=Math.round(hS/tot*100), loss=Math.round(aS/tot*100), draw=100-win-loss;
+  const max=Math.max(win,draw,loss);
+  const pred=win>=draw&&win>=loss?'1':draw>=win&&draw>=loss?'X':'2';
+  const sorted=[{v:win,l:'1'},{v:draw,l:'X'},{v:loss,l:'2'}].sort((a,b)=>b.v-a.v);
+  return{win,draw,loss,pred,max,surprise:sorted[1].v>=26?sorted[1].l:sorted[2].l,
+    conf:max>55?'גבוהה':max>42?'בינונית':'נמוכה',
+    confColor:max>55?'#1D9E75':max>42?'#BA7517':'#A32D2D',
+    hData:h, aData:a};
+}
+
+function buildRow(mode){
+  return state.games.map(g=>{
+    const p=state.preds[g.id]; if(!p) return '?';
+    if(mode==='safe') return p.pred;
+    if(mode==='surprise') return p.surprise;
+    // bold
+    if(p.max<50){const s=[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].sort((a,b)=>b.v-a.v);return s[1].l;}
+    return p.pred;
   });
 }
-const STRATS=[
-  {key:'safe',icon:'🛡️',title:'שורה בטוחה',badge:'הכי בטוח',bc:'#1D9E75',bg:'#E1F5EE',tc:'#085041'},
-  {key:'surprise',icon:'⚡',title:'הפתעות',badge:'ריסק בינוני',bc:'#BA7517',bg:'#FAEEDA',tc:'#633806'},
-  {key:'bold',icon:'🔥',title:'אגרסיבי',badge:'ריסק גבוה',bc:'#A32D2D',bg:'#FCEBEB',tc:'#501313'},
+
+// ── Render ────────────────────────────────────────────────────
+function render(){
+  const el=document.getElementById('main-content');
+  if(state.screen==='enter'){renderEnter(el);return;}
+  if(state.screen==='history'){renderHistory(el);return;}
+  renderMain(el);
+}
+
+function renderEnter(el){
+  document.getElementById('bottom-bar').style.display='none';
+  const topEl=document.querySelector('.tabs');
+  topEl.style.display='none';
+  el.innerHTML=`
+  <div class="card" style="border:1px solid #AFA9EC;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;border-radius:10px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font-size:18px;">🤖</div>
+      <div><div style="font-size:13px;font-weight:500;">הדבק טקסט מ-winner.co.il</div><div style="font-size:11px;color:#888;">העתק את הטקסט מהדף והדבק כאן</div></div>
+    </div>
+    <div style="font-size:11px;color:#888;background:#f5f5f5;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.8;">
+      1. כנס ל-<a href="https://www.winner.co.il/משחקים/וינר-16/רגיל" target="_blank" style="color:#534AB7;font-weight:500;">winner.co.il</a><br>
+      2. Ctrl+A (בחר הכל) ← Ctrl+C (העתק)<br>
+      3. הדבק כאן ולחץ "נתח"
+    </div>
+    <textarea id="paste-input" placeholder="הדבק כאן את הטקסט מהאתר..." rows="5"
+      style="width:100%;padding:10px;border-radius:10px;border:1px solid #AFA9EC;background:#fafafa;font-size:12px;resize:vertical;margin-bottom:10px;"></textarea>
+    <button class="btn btn-primary" onclick="parsePasteText()" style="margin-bottom:6px;">🔍 נתח טקסט ← ייבא משחקים</button>
+    <div id="paste-msg"></div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;margin:14px 0;">
+    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+    <span style="font-size:11px;color:#aaa;">או הכנס ידנית</span>
+    <div style="flex:1;height:1px;background:#e0e0e0;"></div>
+  </div>
+
+  <div style="background:#EEEDFE;border-radius:10px;padding:10px 14px;margin-bottom:14px;border:1px solid #AFA9EC;font-size:11px;color:#534AB7;line-height:1.8;">
+    💡 כנס ל-<strong>winner.co.il</strong> · נתונים מ-<strong>BSD API · sofascore · one.co.il</strong>
+  </div>
+
+  <div id="games-list"></div>
+  <div id="enter-footer" style="position:fixed;bottom:0;left:0;right:0;background:linear-gradient(0,#f8f8fc 60%,transparent);padding:14px 14px 22px;">
+    <div style="max-width:600px;margin:0 auto;">
+      <button class="btn btn-primary" id="analyze-btn" onclick="startAnalysis()" style="opacity:0.4;" disabled>
+        עוד 16 משחקים... (0/16)
+      </button>
+    </div>
+  </div>`;
+  buildGamesList();
+}
+
+let gamesData = Array.from({length:16},(_,i)=>({id:i+1,home:'',away:'',league:''}));
+
+function buildGamesList(){
+  const LEAGUES=['ליגת העל','פרמייר ליג','לה ליגה','בונדסליגה','סריה א','ליג 1','ארדיביזי','ליגת האלופות','אחר'];
+  const el=document.getElementById('games-list');
+  if(!el) return;
+  el.innerHTML=gamesData.map((g,i)=>`
+    <div class="card" style="padding:11px 12px;border:1px solid ${g.home&&g.away?'#AFA9EC':'#e8e8f0'};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+        <span style="font-size:9px;color:#aaa;">משחק #${i+1}</span>
+        <select class="select" style="width:auto;padding:3px 6px;font-size:10px;background:#f5f5f5;border:none;"
+          onchange="updateGame(${g.id},'league',this.value)">
+          <option value="">ליגה...</option>
+          ${LEAGUES.map(l=>`<option value="${l}" ${g.league===l?'selected':''}>${l}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;gap:7px;align-items:center;">
+        <input class="inp" placeholder="קבוצת בית" value="${g.home}"
+          oninput="updateGame(${g.id},'home',this.value)" style="flex:1;">
+        <span style="font-size:10px;color:#ccc;font-weight:500;">VS</span>
+        <input class="inp" placeholder="קבוצת חוץ" value="${g.away}"
+          oninput="updateGame(${g.id},'away',this.value)" style="flex:1;">
+      </div>
+    </div>`).join('');
+  updateAnalyzeBtn();
+}
+
+function updateGame(id,field,val){
+  const g=gamesData.find(g=>g.id===id);
+  if(g) g[field]=val;
+  const card=document.querySelector(`#games-list .card:nth-child(${id})`);
+  if(card) card.style.borderColor=gamesData[id-1]?.home&&gamesData[id-1]?.away?'#AFA9EC':'#e8e8f0';
+  updateAnalyzeBtn();
+}
+
+function updateAnalyzeBtn(){
+  const filled=gamesData.filter(g=>g.home.trim()&&g.away.trim()).length;
+  const btn=document.getElementById('analyze-btn');
+  if(!btn) return;
+  if(filled===16){
+    btn.textContent='🤖 נתח את הטופס ←';
+    btn.style.opacity='1';
+    btn.disabled=false;
+  } else {
+    btn.textContent=`עוד ${16-filled} משחקים... (${filled}/16)`;
+    btn.style.opacity='0.4';
+    btn.disabled=true;
+  }
+}
+
+function parsePasteText(){
+  const text=document.getElementById('paste-input').value;
+  if(!text.trim()){showPasteMsg('הדבק תחילה טקסט','err');return;}
+  const found=extractGamesFromText(text);
+  if(found.length>=8){
+    gamesData=Array.from({length:16},(_,i)=>found[i]||{id:i+1,home:'',away:'',league:''});
+    gamesData.forEach((g,i)=>g.id=i+1);
+    showPasteMsg(`✓ זוהו ${found.length} משחקים!`,'ok');
+    buildGamesList();
+  } else {
+    showPasteMsg(`זוהו רק ${found.length} משחקים — נסה להעתיק יותר טקסט`,'err');
+  }
+}
+
+function extractGamesFromText(text){
+  const lines=text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+  const found=[];
+  for(const line of lines){
+    if(found.length>=16) break;
+    // דפוסים: "קבוצה נגד קבוצה" / "קבוצה - קבוצה" / "קבוצה vs קבוצה"
+    const m=line.match(/^(.+?)\s+(?:נגד|vs\.?|-|–)\s+(.+?)(?:\s+\d|$)/i);
+    if(m){
+      const home=m[1].replace(/^\d+[\.)]\s*/,'').trim();
+      const away=m[2].trim();
+      if(home.length>1&&away.length>1&&!home.match(/^\d+$/)&&!away.match(/^\d+$/)){
+        const lc=line.toLowerCase();
+        const league=lc.includes('פרמייר')?'פרמייר ליג':
+          lc.includes('ספרד')||lc.includes('לה ליגה')?'לה ליגה':
+          lc.includes('בונד')?'בונדסליגה':
+          lc.includes('סריה')?'סריה א':
+          lc.includes('ליג 1')||lc.includes('צרפת')?'ליג 1':
+          lc.includes('ליגת העל')||lc.includes('ישראל')?'ליגת העל':'';
+        found.push({id:found.length+1,home,away,league});
+      }
+    }
+  }
+  return found;
+}
+
+function showPasteMsg(txt,type){
+  const el=document.getElementById('paste-msg');
+  if(!el) return;
+  el.innerHTML=`<div style="margin-top:6px;padding:8px 12px;border-radius:8px;font-size:11px;
+    background:${type==='ok'?'#E1F5EE':'#FCEBEB'};color:${type==='ok'?'#085041':'#501313'};text-align:center;">${txt}</div>`;
+}
+
+async function startAnalysis(){
+  const games=gamesData.filter(g=>g.home.trim()&&g.away.trim());
+  state.games=games;
+  state.preds={};
+  state.picks={};
+  showLoading('מנתח '+games.length+' משחקים','מחפש נתונים ב-BSD API...');
+  document.getElementById('enter-footer').style.display='none';
+  const steps=['מחפש נתוני קבוצות...','טוען תוצאות עונה...','מחשב ELO ופורם...','בונה תחזיות...'];
+  let si=0;
+  const stepInt=setInterval(()=>{
+    si=(si+1)%steps.length;
+    const el=document.getElementById('loading-step');
+    if(el) el.textContent=steps[si];
+  },1500);
+  for(const g of games){
+    const el=document.getElementById('loading-step');
+    if(el) el.textContent='מנתח: '+g.home+' vs '+g.away;
+    const [hs,as_]=await Promise.all([fetchTeamStats(g.home,g.league),fetchTeamStats(g.away,g.league)]);
+    state.preds[g.id]=predictMatch(hs,as_);
+  }
+  clearInterval(stepInt);
+  // שמור היסטוריה
+  const safeRow=buildRow('safe');
+  const entry={date:new Date().toISOString(),games:[...games],preds:{...state.preds},safeRow};
+  state.history=[entry,...state.history].slice(0,20);
+  saveHistory();
+  hideLoading();
+  state.screen='main';
+  state.tab='form';
+  document.querySelector('.tabs').style.display='flex';
+  render();
+}
+
+function renderMain(el){
+  document.getElementById('bottom-bar').style.display='block';
+  updateSafeRowPreview();
+  updatePicksCount();
+  if(state.tab==='form') renderFormTab(el);
+  else if(state.tab==='ai') renderAITab(el);
+  else if(state.tab==='rows') renderRowsTab(el);
+  else if(state.tab==='picks') renderPicksTab(el);
+}
+
+function updateSafeRowPreview(){
+  const sr=buildRow('safe');
+  document.getElementById('safe-row-preview').innerHTML=sr.map(v=>badge(v,19)).join('');
+}
+
+function updatePicksCount(){
+  const cnt=Object.values(state.picks).filter(Boolean).length;
+  document.getElementById('picks-count').textContent=cnt;
+  document.getElementById('picks-total').textContent='/'+state.games.length;
+}
+
+function renderFormTab(el){
+  const STRATS=[
+    {key:'safe',icon:'🛡️',title:'בטוחה',bg:'#E1F5EE',bc:'#1D9E75',tc:'#085041'},
+    {key:'surprise',icon:'⚡',title:'הפתעות',bg:'#FAEEDA',bc:'#BA7517',tc:'#633806'},
+    {key:'bold',icon:'🔥',title:'אגרסיבי',bg:'#FCEBEB',bc:'#A32D2D',tc:'#501313'},
+  ];
+  el.innerHTML=`
+    <div style="display:flex;gap:5px;margin-bottom:12px;overflow-x:auto;padding-bottom:3px;">
+      ${STRATS.map(s=>`<button onclick="applyFill('${s.key}')"
+        style="flex-shrink:0;padding:7px 12px;border:1px solid ${s.bc}66;border-radius:20px;background:${s.bg};color:${s.tc};cursor:pointer;font-size:11px;font-weight:500;white-space:nowrap;">
+        ${s.icon} ${s.title}</button>`).join('')}
+    </div>
+    ${state.games.map((g,i)=>{
+      const p=state.preds[g.id];
+      const myP=state.picks[g.id];
+      return `<div class="card" onclick="openGameDetail(${g.id})" style="cursor:pointer;border-color:${myP?'#AFA9EC':'#e8e8f0'};">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:9px;color:#aaa;">#${i+1}</span>
+          <span style="font-size:9px;color:#aaa;">${g.league||''}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div style="flex:1;">
+            <div style="font-size:12px;font-weight:500;margin-bottom:3px;">${g.home}</div>
+            ${p?`<div style="display:flex;gap:3px;">${(p.hData?.form||[]).map(r=>`<div style="width:7px;height:7px;border-radius:50%;background:${r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'};"></div>`).join('')}</div>`:''}
+          </div>
+          ${p?`<div style="display:flex;gap:8px;padding:0 8px;">
+            ${[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=>`
+              <div style="text-align:center;">
+                <div style="font-size:11px;font-weight:${p.pred===l?500:400};color:${VC(l)};opacity:${p.pred===l?1:0.35};">${v}%</div>
+                <div style="font-size:8px;color:#aaa;">${l}</div>
+              </div>`).join('')}
+          </div>`:'<div style="font-size:11px;color:#aaa;padding:0 8px;">טוען...</div>'}
+          <div style="flex:1;text-align:right;">
+            <div style="font-size:12px;font-weight:500;margin-bottom:3px;">${g.away}</div>
+            ${p?`<div style="display:flex;justify-content:flex-end;gap:3px;">${(p.aData?.form||[]).map(r=>`<div style="width:7px;height:7px;border-radius:50%;background:${r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'};"></div>`).join('')}</div>`:''}
+          </div>
+        </div>
+        ${myP?`<div style="margin-top:7px;text-align:center;">
+          <span style="font-size:10px;font-weight:500;padding:2px 9px;border-radius:20px;background:${VB(myP)};color:${VC(myP)};border:1px solid ${VC(myP)}44;">
+            ${myP} ${p?.pred===myP?'✓ תואם AI':'⚡ שונה מ-AI'}</span></div>`:''}
+      </div>`;
+    }).join('')}
+    ${renderAppNestBadge()}`;
+}
+
+function openGameDetail(id){
+  const g=state.games.find(g=>g.id===id);
+  const p=state.preds[id];
+  if(!g||!p) return;
+  const el=document.getElementById('main-content');
+  el.innerHTML=`
+    <button onclick="switchTab('form',null)" style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:7px;padding:7px 13px;color:#888;cursor:pointer;margin-bottom:12px;font-size:12px;">← חזרה</button>
+    <div class="card">
+      ${g.league?`<div style="text-align:center;margin-bottom:10px;"><span style="background:#f5f5f5;border-radius:20px;padding:3px 10px;font-size:10px;color:#888;">${g.league}</span></div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:14px;font-weight:500;margin-bottom:2px;">${g.home}</div>
+          <div style="font-size:9px;color:#aaa;margin-bottom:6px;">מקום #${p.hData?.position||'?'}</div>
+          <div style="display:flex;gap:3px;justify-content:center;">${(p.hData?.form||[]).map(r=>`<div style="width:8px;height:8px;border-radius:50%;background:${r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'};"></div>`).join('')}</div>
+        </div>
+        <div style="text-align:center;padding:0 10px;">
+          <div style="width:46px;height:46px;border-radius:13px;margin:0 auto;background:${VB(p.pred)};border:1px solid ${VC(p.pred)};display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:500;color:${VC(p.pred)};">${p.pred}</div>
+          <div style="font-size:9px;color:${p.confColor};margin-top:4px;font-weight:500;">ביטחון ${p.conf}</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:14px;font-weight:500;margin-bottom:2px;">${g.away}</div>
+          <div style="font-size:9px;color:#aaa;margin-bottom:6px;">מקום #${p.aData?.position||'?'}</div>
+          <div style="display:flex;gap:3px;justify-content:center;">${(p.aData?.form||[]).map(r=>`<div style="width:8px;height:8px;border-radius:50%;background:${r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'};"></div>`).join('')}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        ${[{l:'ניצחון בית',v:p.win,c:'#1D9E75'},{l:'תיקו',v:p.draw,c:'#BA7517'},{l:'ניצחון חוץ',v:p.loss,c:'#A32D2D'}].map(({l,v,c})=>`
+          <div style="flex:1;text-align:center;">
+            <div style="font-size:20px;font-weight:500;color:${c};margin-bottom:4px;">${v}%</div>
+            <div class="pct-bar"><div style="width:${v}%;height:100%;background:${c};border-radius:2px;"></div></div>
+            <div style="font-size:10px;color:#888;">${l}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      ${[[`⚽ גולים`,`${(p.hData?.goalsFor||0).toFixed(1)} | ${(p.aData?.goalsFor||0).toFixed(1)}`,'#534AB7'],
+        [`📍 טבלה`,`#${p.hData?.position||'?'} | #${p.aData?.position||'?'}`,'#185FA5'],
+        [`🏠 יתרון בית`,'+12% ממוצע','#1D9E75'],
+        [`🔥 ניצחונות`,`${p.hData?.wins||0}W | ${p.aData?.wins||0}W`,'#BA7517']
+      ].map(([t,v,c])=>`<div class="card" style="padding:11px;"><div style="font-size:9px;color:#aaa;margin-bottom:3px;">${t}</div><div style="font-size:14px;font-weight:500;color:${c};">${v}</div></div>`).join('')}
+    </div>`;
+}
+
+function renderAITab(el){
+  el.innerHTML=state.games.map(g=>{
+    const p=state.preds[g.id]; if(!p) return '';
+    return `<div class="card" onclick="openGameDetail(${g.id})" style="cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="flex:1;">
+          <div style="font-size:11px;font-weight:500;margin-bottom:4px;">${g.home} – ${g.away}</div>
+          <div style="display:flex;gap:9px;">
+            ${[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=>`
+              <div>
+                <div class="pct-bar" style="width:38px;"><div style="width:${v}%;height:100%;background:${VC(l)};border-radius:2px;"></div></div>
+                <div style="font-size:9px;color:${VC(l)};opacity:${p.pred===l?1:0.35};margin-top:2px;">${l} ${v}%</div>
+              </div>`).join('')}
+          </div>
+        </div>
+        <div style="text-align:center;">
+          ${badge(p.pred,34)}
+          <div style="font-size:8px;color:${p.confColor};font-weight:500;margin-top:3px;">${p.conf}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('')+renderAppNestBadge();
+}
+
+const STRAT_CONFIG=[
+  {key:'safe',icon:'🛡️',title:'שורה בטוחה',badge:'הכי בטוח',bc:'#1D9E75',bg:'#E1F5EE',tc:'#085041',desc:'האחוזים הגבוהים ביותר בכל משחק'},
+  {key:'surprise',icon:'⚡',title:'הפתעות סטטיסטיות',badge:'ריסק בינוני',bc:'#BA7517',bg:'#FAEEDA',tc:'#633806',desc:'תוצאות שנראות פחות צפויות אך מגובות בנתונים'},
+  {key:'bold',icon:'🔥',title:'שורה אגרסיבית',badge:'ריסק גבוה',bc:'#A32D2D',bg:'#FCEBEB',tc:'#501313',desc:'במשחקים לא-סגורים בוחר אופציה שנייה'},
 ];
 
-// ── Shared UI ─────────────────────────────────────────────────
-function Dots({form}){
-  return <div style={{display:'flex',gap:3}}>{(form||[]).map((r,i)=><div key={i} style={{width:7,height:7,borderRadius:'50%',background:r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'}}/>)}</div>;
-}
-function Cell({v,size=22}){
-  return <div style={{width:size,height:size,borderRadius:5,background:VB(v),border:`0.5px solid ${VC(v)}66`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*0.45,fontWeight:500,color:VC(v)}}>{v}</div>;
-}
-function AppNestBadge(){
-  return <div style={{margin:'16px 14px 0',padding:'12px 14px',background:'rgba(212,168,83,0.08)',border:'1px solid rgba(212,168,83,0.2)',borderRadius:12}}>
-    <a href="https://barakaflalo.github.io/appnest" target="_blank" style={{display:'flex',alignItems:'center',gap:10,textDecoration:'none'}}>
-      <svg width="28" height="28" viewBox="0 0 58 58"><polygon points="29,2 54,16 54,42 29,56 4,42 4,16" fill="#d4a853"/><polygon points="29,5 51,17.5 51,40.5 29,53 7,40.5 7,17.5" fill="#0a0a0a"/><ellipse cx="29" cy="19" rx="6.5" ry="6.5" fill="#e8e8e0"/><circle cx="31" cy="18" r="2" fill="#d4a853"/><path d="M33 20 L39 22 L33 24 Z" fill="#d4a853"/><path d="M22 26 Q12 20 8 24 Q10 30 18 29Z" fill="#222"/><path d="M36 26 Q46 20 50 24 Q48 30 40 29Z" fill="#222"/></svg>
-      <div style={{flex:1}}>
-        <div style={{fontSize:13,fontWeight:700,color:'#d4a853'}}>AppNest</div>
-        <div style={{fontSize:11,color:'#888'}}>עוד אפליקציות חינמיות מבית AppNest ›</div>
-      </div>
-      <span style={{color:'#d4a853',fontSize:16}}>›</span>
-    </a>
-  </div>;
-}
-
-// ── Setup Screen ──────────────────────────────────────────────
-function Setup({saved,onDone}){
-  const [key,setKey]=useState('');const [showKey,setShowKey]=useState(false);
-  return <div style={{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
-    <div style={{width:52,height:52,borderRadius:14,background:'#534AB7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:14,color:'#EEEDFE'}}>⚽</div>
-    <div style={{fontSize:22,fontWeight:500,marginBottom:4}}>טוטו אנליזר</div>
-    <div style={{fontSize:11,color:'#534AB7',marginBottom:28,fontWeight:500,letterSpacing:1}}>מנוע חיזוי AI</div>
-    <div style={{width:'100%',maxWidth:360}}>
-      {saved&&<div style={{background:'#EEEDFE',borderRadius:12,padding:'10px 16px',marginBottom:12,border:'0.5px solid #AFA9EC',textAlign:'center'}}>
-        <div style={{fontSize:11,color:'#534AB7',marginBottom:6}}>ברוך הבא! מצב שמור: {saved==='ai'?'🤖 AI':'🔑 API'}</div>
-        <button onClick={()=>onDone(saved)} style={{width:'100%',padding:10,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer'}}>המשך ←</button>
-      </div>}
-      {!showKey?<>
-        <button onClick={()=>onDone('ai')} style={{width:'100%',padding:'16px 18px',marginBottom:10,borderRadius:14,background:'#fff',border:'0.5px solid #AFA9EC',cursor:'pointer',textAlign:'right'}}>
-          <div style={{fontSize:15,fontWeight:500,marginBottom:3}}>🤖 מצב AI <span style={{fontSize:9,color:'#534AB7',background:'#EEEDFE',padding:'2px 8px',borderRadius:6,marginRight:8}}>מומלץ</span></div>
-          <div style={{fontSize:11,color:'#888'}}>BSD API — נתונים אמיתיים: פורם, טבלה, גולים</div>
-        </button>
-        <button onClick={()=>setShowKey(true)} style={{width:'100%',padding:'16px 18px',borderRadius:14,background:'#fff',border:'0.5px solid #e0e0e0',cursor:'pointer',textAlign:'right'}}>
-          <div style={{fontSize:15,fontWeight:500,marginBottom:3}}>🔑 BSD API Token</div>
-          <div style={{fontSize:11,color:'#888'}}>מפתח מ-sports.bzzoiro.com (חינם)</div>
-        </button>
-        <AppNestBadge/>
-      </>:<div>
-        <button onClick={()=>setShowKey(false)} style={{background:'none',border:'none',color:'#888',cursor:'pointer',marginBottom:12,fontSize:12}}>← חזרה</button>
-        <input placeholder="הכנס API Key..." value={key} onChange={e=>setKey(e.target.value)}
-          style={{width:'100%',padding:'12px 14px',borderRadius:10,border:'0.5px solid #ccc',background:'#fff',fontSize:12,marginBottom:12,direction:'ltr',outline:'none'}}/>
-        <button onClick={()=>key.trim()&&onDone('apikey',key.trim())} disabled={!key.trim()}
-          style={{width:'100%',padding:14,borderRadius:12,border:'none',background:key.trim()?'#534AB7':'#e0e0e0',color:key.trim()?'#fff':'#aaa',fontWeight:500,cursor:key.trim()?'pointer':'default'}}>התחבר ←</button>
-      </div>}
-    </div>
-  </div>;
-}
-
-// ── Enter Games Screen ────────────────────────────────────────
-function EnterGames({onDone,onHistory}){
-  const [games,setGames]=useState(()=>Array.from({length:16},(_,i)=>({id:i+1,home:'',away:'',league:''})));
-  const [loading,setLoading]=useState(false);
-  const [autoLoad,setAutoLoad]=useState(false);
-  const [autoMsg,setAutoMsg]=useState('');
-  const [autoErr,setAutoErr]=useState('');
-  const filled=games.filter(g=>g.home.trim()&&g.away.trim()).length;
-  const upd=(id,f,v)=>setGames(p=>p.map(g=>g.id===id?{...g,[f]:v}:g));
-  const LEAGUES=['ליגת העל','פרמייר ליג','לה ליגה','בונדסליגה','סריה א','ליג 1','ארדיביזי','ליגת האלופות','אחר'];
-
-  // פרסור טקסט מ-toto.co.il
-  const [pasteText,setPasteText]=useState('');
-  const [showPaste,setShowPaste]=useState(false);
-
-  function parseGamesFromText(text){
-    const lines=text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
-    const found=[];
-    // חפש דפוסי "קבוצה נגד קבוצה" או "קבוצה - קבוצה" או "קבוצה vs קבוצה"
-    const patterns=[
-      /^(.+?)\s+(?:נגד|vs\.?|-|–)\s+(.+?)(?:\s+[\(\[].*[\)\]])?$/i,
-      /^\d+[\.)]\.?\s*(.+?)\s+(?:נגד|vs\.?|-|–)\s+(.+)$/i,
-    ];
-    for(const line of lines){
-      for(const pat of patterns){
-        const m=line.match(pat);
-        if(m){
-          const home=m[1].replace(/^\d+[\.)]\.?\s*/,'').trim();
-          const away=m[2].replace(/[\(\[].*[\)\]].*$/,'').trim();
-          if(home.length>1&&away.length>1&&found.length<16){
-            // נסה לזהות ליגה
-            const lstr=line.toLowerCase();
-            const league=lstr.includes('פרמייר')||lstr.includes('אנגל')?'פרמייר ליג':
-              lstr.includes('ספרד')||lstr.includes('לה ליגה')?'לה ליגה':
-              lstr.includes('גרמנ')||lstr.includes('בונד')?'בונדסליגה':
-              lstr.includes('איטל')||lstr.includes('סריה')?'סריה א':
-              lstr.includes('צרפת')||lstr.includes('ליג 1')?'ליג 1':
-              lstr.includes('ליגת העל')||lstr.includes('ישראל')?'ליגת העל':'';
-            found.push({id:found.length+1,home,away,league});
-            break;
-          }
-        }
-      }
-    }
-    // נסיון שני — חפש שורות עם "בית" ו"חוץ"
-    if(found.length<8){
-      const homeAwayPat=/([\u0590-\u05FF\w\s]+?)\s{2,}([\u0590-\u05FF\w\s]+)/g;
-      let m2;
-      while((m2=homeAwayPat.exec(text))&&found.length<16){
-        const h=m2[1].trim(),a=m2[2].trim();
-        if(h.length>2&&a.length>2&&!h.match(/^\d+$/)&&!a.match(/^\d+$/))
-          found.push({id:found.length+1,home:h,away:a,league:''});
-      }
-    }
-    return found;
-  }
-
-  const handlePasteParse=()=>{
-    if(!pasteText.trim()){setAutoErr('הדבק תחילה את הטקסט');return;}
-    const found=parseGamesFromText(pasteText);
-    if(found.length>=8){
-      setAutoMsg(`✓ זוהו ${found.length} משחקים!`);
-      const filled2=found.length===16?found:[...found,...Array.from({length:16-found.length},(_,i)=>({id:found.length+i+1,home:'',away:'',league:''}))];
-      setGames(filled2);setShowPaste(false);setPasteText('');
-      setTimeout(()=>setAutoMsg(''),3000);
-    }else{
-      setAutoErr(`זוהו רק ${found.length} משחקים — נסה להעתיק יותר טקסט מהדף`);
-    }
-  };
-
-  const handleAuto=()=>{setShowPaste(true);setAutoErr('');};
-
-  return <div style={{minHeight:'100vh',background:'#f8f8fc'}}>
-    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 16px 12px',position:'sticky',top:0,zIndex:100}}>
-      <div style={{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div>
-          <div style={{fontSize:15,fontWeight:500}}>📋 הכנסת טופס</div>
-          <div style={{fontSize:10,color:'#888'}}>מ-toto.co.il</div>
-        </div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-          <button onClick={onHistory} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:8,padding:'6px 12px',color:'#888',cursor:'pointer',fontSize:11}}>📚 היסטוריה</button>
-          <div style={{textAlign:'center'}}>
-            <div style={{fontSize:9,color:'#aaa'}}>הוכנסו</div>
-            <div style={{fontSize:18,fontWeight:500,color:filled===16?'#1D9E75':'#1a1a2e'}}>{filled}<span style={{fontSize:11,color:'#aaa'}}>/16</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div style={{maxWidth:600,margin:'0 auto',padding:'14px 14px 130px'}}>
-      <div style={{background:'#fff',borderRadius:14,padding:16,marginBottom:14,border:'0.5px solid #AFA9EC'}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-          <div style={{width:36,height:36,borderRadius:10,background:'#EEEDFE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🤖</div>
+function renderRowsTab(el){
+  const safeRow=buildRow('safe');
+  el.innerHTML=STRAT_CONFIG.map(s=>{
+    const row=buildRow(s.key);
+    const diff=s.key!=='safe'?row.filter((v,i)=>v!==safeRow[i]).length:0;
+    return `<div class="card" style="border:1px solid ${s.bc}44;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:9px;">
+          <div style="width:34px;height:34px;border-radius:9px;background:${s.bg};border:1px solid ${s.bc}44;display:flex;align-items:center;justify-content:center;font-size:18px;">${s.icon}</div>
           <div>
-            <div style={{fontSize:13,fontWeight:500}}>טעינה אוטומטית</div>
-            <div style={{fontSize:11,color:'#888'}}>Claude יחפש את 16 המשחקים</div>
+            <div style="font-size:13px;font-weight:500;">${s.title}</div>
+            <span style="font-size:9px;color:${s.tc};background:${s.bg};padding:2px 7px;border-radius:20px;border:1px solid ${s.bc}44;font-weight:500;">${s.badge}</span>
           </div>
         </div>
-        {!showPaste?<>
-          <button onClick={handleAuto} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>
-            ✨ טען טופס שבועי — הדבק טקסט
-          </button>
-          <div style={{marginTop:8,fontSize:11,color:'#888',lineHeight:1.7,textAlign:'center'}}>
-            כנס ל-<a href="https://www.toto.co.il" target="_blank" style={{color:'#534AB7'}}>toto.co.il</a> ← העתק את כל הטקסט של הדף ← הדבק כאן
-          </div>
-        </>:<div>
-          <div style={{fontSize:11,color:'#534AB7',fontWeight:500,marginBottom:8}}>
-            📋 הדבק את הטקסט מ-toto.co.il:
-          </div>
-          <div style={{fontSize:11,color:'#888',marginBottom:8,lineHeight:1.7,background:'#f5f5f5',borderRadius:8,padding:'8px 10px'}}>
-            1. כנס ל-<a href="https://www.toto.co.il" target="_blank" style={{color:'#534AB7'}}>toto.co.il</a><br/>
-            2. בחר הכל (Ctrl+A) ← העתק (Ctrl+C)<br/>
-            3. הדבק כאן ולחץ "נתח"
-          </div>
-          <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)}
-            placeholder="הדבק כאן את הטקסט מהאתר..."
-            style={{width:'100%',minHeight:120,padding:'10px 12px',borderRadius:10,border:'0.5px solid #AFA9EC',
-              background:'#fafafa',fontSize:12,resize:'vertical',outline:'none',marginBottom:8,direction:'rtl'}}/>
-          <div style={{display:'flex',gap:8}}>
-            <button onClick={handlePasteParse} style={{flex:1,padding:11,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>
-              🔍 נתח טקסט
-            </button>
-            <button onClick={()=>{setShowPaste(false);setPasteText('');setAutoErr('')}} style={{padding:'11px 14px',borderRadius:10,border:'0.5px solid #e0e0e0',background:'#fff',color:'#888',cursor:'pointer',fontSize:12}}>
-              ביטול
-            </button>
-          </div>
-        </div>}
-        {autoMsg&&<div style={{marginTop:8,padding:'8px 12px',background:'#E1F5EE',borderRadius:8,fontSize:11,color:'#085041',textAlign:'center'}}>{autoMsg}</div>}
-        {autoErr&&<div style={{marginTop:8,padding:'8px 12px',background:'#FCEBEB',borderRadius:8,fontSize:11,color:'#501313',textAlign:'center'}}>{autoErr}</div>}
+        <button onclick="applyFill('${s.key}')" style="padding:7px 14px;border-radius:20px;border:none;cursor:pointer;background:${s.bc};color:#fff;font-weight:500;font-size:11px;">החל ✓</button>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
-        <div style={{flex:1,height:'0.5px',background:'#e0e0e0'}}/>
-        <div style={{fontSize:11,color:'#aaa'}}>או הכנס ידנית</div>
-        <div style={{flex:1,height:'0.5px',background:'#e0e0e0'}}/>
-      </div>
-      <div style={{background:'#EEEDFE',borderRadius:10,padding:'10px 14px',marginBottom:14,border:'0.5px solid #AFA9EC',fontSize:11,color:'#534AB7',lineHeight:1.8}}>
-        💡 כנס ל-<strong>toto.co.il</strong> · נתונים אמיתיים מ-<strong>BSD API · sports.bzzoiro.com</strong>
-      </div>
-      {games.map((g,i)=><div key={g.id} style={{background:'#fff',borderRadius:12,padding:'11px 12px',marginBottom:7,border:`0.5px solid ${g.home&&g.away?'#AFA9EC':'#e8e8f0'}`}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-          <div style={{fontSize:9,color:'#aaa'}}>משחק #{i+1}</div>
-          <select value={g.league} onChange={e=>upd(g.id,'league',e.target.value)} style={{background:'#f5f5f5',border:'none',color:'#888',fontSize:10,borderRadius:6,padding:'3px 6px'}}>
-            <option value="">ליגה...</option>
-            {LEAGUES.map(l=><option key={l}>{l}</option>)}
-          </select>
+      <div style="font-size:11px;color:#888;margin-bottom:10px;line-height:1.6;">${s.desc}</div>
+      <div style="background:#fafafa;border-radius:9px;padding:9px 11px;">
+        <div style="font-size:9px;color:#aaa;margin-bottom:6px;font-weight:500;">תצוגה מקדימה:</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;">
+          ${row.map((v,i)=>`<div style="text-align:center;"><div style="font-size:7px;color:#ccc;margin-bottom:2px;">${i+1}</div>${badge(v)}</div>`).join('')}
         </div>
-        <div style={{display:'flex',gap:7,alignItems:'center'}}>
-          <input placeholder="קבוצת בית" value={g.home} onChange={e=>upd(g.id,'home',e.target.value)}
-            style={{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.home?'#AFA9EC':'#e0e0e0'}`,background:'#fafafa',fontSize:12,outline:'none',color:'#1a1a2e'}}/>
-          <div style={{fontSize:10,color:'#ccc',fontWeight:500}}>VS</div>
-          <input placeholder="קבוצת חוץ" value={g.away} onChange={e=>upd(g.id,'away',e.target.value)}
-            style={{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.away?'#AFA9EC':'#e0e0e0'}`,background:'#fafafa',fontSize:12,outline:'none',color:'#1a1a2e'}}/>
-        </div>
-      </div>)}
-    </div>
-    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'linear-gradient(0deg,#f8f8fc 60%,transparent)',padding:'14px 14px 22px'}}>
-      <div style={{maxWidth:600,margin:'0 auto'}}>
-        <button onClick={()=>{if(filled<16||loading)return;setLoading(true);onDone(games.filter(g=>g.home.trim()&&g.away.trim()));}} disabled={filled<16||loading}
-          style={{width:'100%',padding:16,borderRadius:13,border:'none',background:filled===16?'#534AB7':'#e0e0e0',color:filled===16?'#fff':'#aaa',fontWeight:500,fontSize:14,cursor:filled===16?'pointer':'default'}}>
-          {loading?'⏳ טוען...':filled<16?`עוד ${16-filled} משחקים...`:'🤖 נתח את הטופס ←'}
-        </button>
       </div>
-    </div>
-  </div>;
+      ${s.key!=='safe'?`<div style="margin-top:7px;font-size:10px;color:#aaa;text-align:center;">${diff} שינויים מהשורה הבטוחה</div>`:''}
+    </div>`;
+  }).join('')+renderAppNestBadge();
 }
 
-// ── Loading Screen ────────────────────────────────────────────
-function Loading({games}){
-  const steps=['מחפש נתוני קבוצות...','טוען תוצאות...','מחשב ELO...','בונה תחזיות...','מכין שורות...'];
-  const [step,setStep]=useState(0);
-  useEffect(()=>{const t=setInterval(()=>setStep(s=>Math.min(s+1,4)),1200);return()=>clearInterval(t);},[]);
-  return <div style={{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
-    <div style={{fontSize:52,marginBottom:16,animation:'spin 2s linear infinite'}}>⚙️</div>
-    <div style={{fontSize:15,fontWeight:500,color:'#534AB7',marginBottom:6}}>מנתח {games.length} משחקים</div>
-    <div style={{fontSize:12,color:'#aaa',marginBottom:28}}>{steps[step]}</div>
-    <div style={{width:260}}>
-      {games.slice(0,6).map((g,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'0.5px solid #e8e8f0',fontSize:11}}>
-        <span style={{color:i<=step*3?'#534AB7':'#ccc'}}>{g.home}</span>
-        <span style={{color:'#ddd'}}>vs</span>
-        <span style={{color:i<=step*3?'#534AB7':'#ccc'}}>{g.away}</span>
-      </div>)}
-    </div>
-  </div>;
-}
-
-// ── History Screen ────────────────────────────────────────────
-function History({history,onBack,onLoad}){
-  const [sel,setSel]=useState(null);
-  const entry=sel!=null?history[sel]:null;
-  return <div style={{minHeight:'100vh',background:'#f8f8fc'}}>
-    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 14px',position:'sticky',top:0}}>
-      <div style={{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',gap:12}}>
-        <button onClick={sel!=null?()=>setSel(null):onBack} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:8,padding:'7px 13px',color:'#888',cursor:'pointer',fontSize:12}}>←</button>
-        <div style={{fontSize:15,fontWeight:500}}>📚 היסטוריה</div>
-        <div style={{fontSize:11,color:'#aaa'}}>{history.length} טפסים</div>
+function renderPicksTab(el){
+  const autoMode=state.autoMode;
+  const sc=autoMode?STRAT_CONFIG.find(s=>s.key===autoMode):null;
+  el.innerHTML=(sc?`<div style="background:${sc.bg};border-radius:10px;padding:9px 14px;margin-bottom:12px;border:1px solid ${sc.bc}44;display:flex;justify-content:space-between;align-items:center;">
+    <div style="font-size:11px;color:${sc.tc};font-weight:500;">${sc.icon} ${sc.title}</div>
+    <button onclick="clearPicks()" style="background:transparent;border:1px solid ${sc.bc}44;border-radius:6px;padding:3px 9px;color:${sc.tc};cursor:pointer;font-size:10px;">נקה</button>
+  </div>`:'') +
+  state.games.map((g,i)=>{
+    const p=state.preds[g.id], myP=state.picks[g.id];
+    return `<div class="card" style="border-color:${myP?'#AFA9EC':'#e8e8f0'};">
+      <div style="display:flex;justify-content:space-between;margin-bottom:7px;">
+        <span style="font-size:9px;color:#aaa;">#${i+1} · ${g.league||''}</span>
+        ${p?`<span style="font-size:9px;color:${p.confColor};font-weight:500;">ביטחון ${p.conf}</span>`:''}
       </div>
-    </div>
-    <div style={{maxWidth:600,margin:'0 auto',padding:'14px 13px 40px'}}>
-      {!entry&&<>
-        {history.length===0&&<div style={{textAlign:'center',padding:'60px 20px',color:'#aaa',fontSize:13}}>אין היסטוריה עדיין.</div>}
-        {history.map((h,i)=><div key={i} onClick={()=>setSel(i)} style={{background:'#fff',borderRadius:13,padding:'13px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-            <div style={{fontSize:13,fontWeight:500}}>טופס {fmtD(h.date)}</div>
-            <div style={{fontSize:10,color:'#aaa'}}>{h.games?.length} משחקים</div>
-          </div>
-          <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>{h.safeRow?.map((v,j)=><Cell key={j} v={v}/>)}</div>
-        </div>)}
-      </>}
-      {entry&&<>
-        <div style={{background:'#fff',borderRadius:14,padding:16,marginBottom:14,border:'0.5px solid #e8e8f0'}}>
-          <div style={{fontSize:12,color:'#534AB7',fontWeight:500,marginBottom:10}}>🛡️ שורה בטוחה</div>
-          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-            {entry.safeRow?.map((v,j)=><div key={j} style={{textAlign:'center'}}>
-              <div style={{fontSize:8,color:'#aaa',marginBottom:2}}>{j+1}</div>
-              <Cell v={v} size={24}/>
-            </div>)}
-          </div>
-        </div>
-        <button onClick={()=>onLoad(entry)} style={{width:'100%',padding:14,borderRadius:12,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>טען טופס זה מחדש ←</button>
-      </>}
-    </div>
-  </div>;
-}
-
-// ── Main App ──────────────────────────────────────────────────
-function MainApp({games,preds,dataMode,onNewForm,onHistory}){
-  const [tab,setTab]=useState('form');
-  const [sel,setSel]=useState(null);
-  const [picks,setPicks]=useState({});
-  const [autoMode,setAuto]=useState(null);
-  const cnt=Object.values(picks).filter(Boolean).length;
-  const setPick=(id,v)=>setPicks(p=>({...p,[id]:p[id]===v?null:v}));
-  const applyFill=mode=>{
-    const row=buildRow(mode,preds,games);
-    const np={};games.forEach((g,i)=>{np[g.id]=row[i]});
-    setPicks(np);setAuto(mode);setTab('picks');
-  };
-  const safeRow=buildRow('safe',preds,games);
-  const selP=sel?preds[sel.id]:null;
-
-  return <div style={{background:'#f8f8fc',minHeight:'100vh'}}>
-    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'14px 14px 0',position:'sticky',top:0,zIndex:100}}>
-      <div style={{maxWidth:600,margin:'0 auto'}}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:9}}>
-            <div style={{width:34,height:34,borderRadius:10,background:'#534AB7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,color:'#EEEDFE'}}>⚽</div>
-            <div>
-              <div style={{fontSize:16,fontWeight:500}}>טוטו אנליזר</div>
-              <div style={{fontSize:9,color:'#534AB7',fontWeight:500}}>🤖 BSD API · נתונים אמיתיים</div>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            <button onClick={onHistory} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'5px 9px',color:'#888',cursor:'pointer',fontSize:11}}>📚</button>
-            <button onClick={onNewForm} style={{background:'#EEEDFE',border:'0.5px solid #AFA9EC',borderRadius:7,padding:'5px 9px',color:'#534AB7',cursor:'pointer',fontSize:10,fontWeight:500}}>+ טופס</button>
-            <div style={{textAlign:'center'}}>
-              <div style={{fontSize:8,color:'#aaa'}}>מילאתי</div>
-              <div style={{fontSize:17,fontWeight:500,color:cnt===games.length?'#1D9E75':'#1a1a2e'}}>{cnt}<span style={{fontSize:10,color:'#aaa'}}>/{games.length}</span></div>
-            </div>
-          </div>
-        </div>
-        <div style={{display:'flex'}}>
-          {[['form','📋 טופס'],['ai','🤖 ניתוח'],['rows','✨ שורות'],['picks','✏️ שלי']].map(([t,lb])=><button key={t} onClick={()=>{setTab(t);setSel(null)}} style={{flex:1,padding:'10px 2px',border:'none',borderBottom:tab===t?'2px solid #534AB7':'2px solid transparent',background:'transparent',color:tab===t?'#534AB7':'#aaa',fontWeight:tab===t?500:400,fontSize:11,cursor:'pointer'}}>{lb}</button>)}
-        </div>
+      <div style="font-size:12px;font-weight:500;text-align:center;margin-bottom:9px;">${g.home} — ${g.away}</div>
+      <div style="display:flex;gap:7px;">
+        ${[['1','בית'],['X','תיקו'],['2','חוץ']].map(([v,lb])=>{
+          const isAI=p?.pred===v, isPicked=myP===v;
+          return `<button onclick="togglePick(${g.id},'${v}')"
+            style="flex:1;padding:10px 4px;border:1px solid ${isPicked?VC(v):'#e0e0e0'};border-radius:10px;cursor:pointer;
+            background:${isPicked?VB(v):'#fafafa'};color:${isPicked?VC(v):'#aaa'};font-weight:${isPicked?500:400};font-size:16px;position:relative;">
+            ${isAI?`<div style="position:absolute;top:-7px;right:-4px;background:#534AB7;border-radius:4px;padding:1px 4px;font-size:7px;color:#EEEDFE;font-weight:500;">AI</div>`:''}
+            ${v}<div style="font-size:8px;opacity:0.6;margin-top:2px;">${lb}</div>
+            ${p?`<div style="font-size:8px;opacity:0.5;">${v==='1'?p.win:v==='X'?p.draw:p.loss}%</div>`:''}
+          </button>`;
+        }).join('')}
       </div>
+    </div>`;
+  }).join('')+renderAppNestBadge();
+}
+
+function applyFill(mode){
+  const row=buildRow(mode);
+  state.picks={};
+  state.games.forEach((g,i)=>{state.picks[g.id]=row[i];});
+  state.autoMode=mode;
+  switchTab('picks',null);
+}
+
+function togglePick(id,v){
+  state.picks[id]=state.picks[id]===v?null:v;
+  updatePicksCount();
+  renderPicksTab(document.getElementById('main-content'));
+}
+
+function clearPicks(){state.picks={};state.autoMode=null;renderPicksTab(document.getElementById('main-content'));}
+
+function renderHistory(el){
+  document.getElementById('bottom-bar').style.display='none';
+  document.querySelector('.tabs').style.display='none';
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <button onclick="backToMain()" style="background:#f5f5f5;border:1px solid #e0e0e0;border-radius:8px;padding:7px 13px;color:#888;cursor:pointer;font-size:12px;">←</button>
+      <div style="font-size:15px;font-weight:500;">📚 היסטוריית טפסים</div>
+      <div style="font-size:11px;color:#aaa;">${state.history.length} טפסים</div>
     </div>
-
-    <div style={{maxWidth:600,margin:'0 auto',padding:'13px 13px 100px'}}>
-
-      {tab==='form'&&<div>
-        {sel&&selP?<div>
-          <button onClick={()=>setSel(null)} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'7px 13px',color:'#888',cursor:'pointer',marginBottom:12,fontSize:12}}>← חזרה</button>
-          <div style={{background:'#fff',borderRadius:14,padding:18,marginBottom:10,border:'0.5px solid #e8e8f0'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-              <div style={{flex:1,textAlign:'center'}}>
-                <div style={{fontSize:14,fontWeight:500,marginBottom:2}}>{sel.home}</div>
-                <div style={{fontSize:9,color:'#aaa',marginBottom:6}}>מקום #{selP.hPos}</div>
-                <Dots form={selP.hForm}/>
-              </div>
-              <div style={{textAlign:'center',padding:'0 10px'}}>
-                <div style={{width:46,height:46,borderRadius:13,margin:'0 auto',background:VB(selP.pred),border:`0.5px solid ${VC(selP.pred)}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,fontWeight:500,color:VC(selP.pred)}}>{selP.pred}</div>
-                <div style={{fontSize:9,color:selP.confColor,marginTop:4,fontWeight:500}}>ביטחון {selP.conf}</div>
-              </div>
-              <div style={{flex:1,textAlign:'center'}}>
-                <div style={{fontSize:14,fontWeight:500,marginBottom:2}}>{sel.away}</div>
-                <div style={{fontSize:9,color:'#aaa',marginBottom:6}}>מקום #{selP.aPos}</div>
-                <Dots form={selP.aForm}/>
-              </div>
-            </div>
-            <div style={{display:'flex',gap:12}}>
-              {[{l:'ניצחון בית',v:selP.win,c:'#1D9E75'},{l:'תיקו',v:selP.draw,c:'#BA7517'},{l:'ניצחון חוץ',v:selP.loss,c:'#A32D2D'}].map(({l,v,c})=><div key={l} style={{flex:1,textAlign:'center'}}>
-                <div style={{fontSize:18,fontWeight:500,color:c}}>{v}%</div>
-                <div style={{height:4,borderRadius:2,background:'#e0e0e0',overflow:'hidden',margin:'4px 0'}}><div style={{width:v+'%',height:'100%',background:c}}/></div>
-                <div style={{fontSize:10,color:'#888'}}>{l}</div>
-              </div>)}
-            </div>
-          </div>
-        </div>:<div>
-          <div style={{display:'flex',gap:5,marginBottom:12,overflowX:'auto',paddingBottom:3}}>
-            {STRATS.map(s=><button key={s.key} onClick={()=>applyFill(s.key)} style={{flexShrink:0,padding:'7px 12px',border:`0.5px solid ${s.bc}66`,borderRadius:20,background:s.bg,color:s.tc,cursor:'pointer',fontSize:11,fontWeight:500}}>{s.icon} {s.title}</button>)}
-          </div>
-          {games.map((g,i)=>{const p=preds[g.id],myP=picks[g.id];
-            return <div key={g.id} onClick={()=>setSel(g)} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:`0.5px solid ${myP?'#AFA9EC':'#e8e8f0'}`,cursor:'pointer'}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                <span style={{fontSize:9,color:'#aaa'}}>#{i+1}</span>
-                <span style={{fontSize:9,color:'#aaa'}}>{g.league}</span>
-              </div>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{g.home}</div>
-                  {p&&<Dots form={p.hForm}/>}
-                </div>
-                {p&&<div style={{display:'flex',gap:8,padding:'0 8px'}}>
-                  {[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=><div key={l} style={{textAlign:'center'}}>
-                    <div style={{fontSize:11,fontWeight:p.pred===l?500:400,color:VC(l),opacity:p.pred===l?1:0.35}}>{v}%</div>
-                    <div style={{fontSize:8,color:'#aaa'}}>{l}</div>
-                  </div>)}
-                </div>}
-                <div style={{flex:1,textAlign:'right'}}>
-                  <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{g.away}</div>
-                  {p&&<div style={{display:'flex',justifyContent:'flex-end'}}><Dots form={p.aForm}/></div>}
-                </div>
-              </div>
-              {myP&&<div style={{marginTop:7,textAlign:'center'}}>
-                <span style={{fontSize:10,fontWeight:500,padding:'2px 9px',borderRadius:20,background:VB(myP),color:VC(myP),border:`0.5px solid ${VC(myP)}44`}}>{myP} {p?.pred===myP?'✓ תואם AI':'⚡ שונה מ-AI'}</span>
-              </div>}
-            </div>;})}
-        </div>}
-      </div>}
-
-      {tab==='ai'&&games.map(g=>{const p=preds[g.id];if(!p)return null;
-        return <div key={g.id} onClick={()=>{setSel(g);setTab('form')}} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <div style={{flex:1}}>
-              <div style={{fontSize:11,fontWeight:500,marginBottom:4}}>{g.home} – {g.away}</div>
-              <div style={{display:'flex',gap:9}}>
-                {[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=><div key={l}>
-                  <div style={{height:3,width:38,background:'#f0f0f0',borderRadius:2}}><div style={{width:v+'%',height:'100%',background:VC(l),borderRadius:2}}/></div>
-                  <div style={{fontSize:9,color:VC(l),opacity:p.pred===l?1:0.35,marginTop:2}}>{l} {v}%</div>
-                </div>)}
-              </div>
-            </div>
-            <div style={{textAlign:'center'}}><Cell v={p.pred} size={34}/><div style={{fontSize:8,color:p.confColor,fontWeight:500,marginTop:3}}>{p.conf}</div></div>
-          </div>
-        </div>;})}
-
-      {tab==='rows'&&<div>
-        {STRATS.map(s=>{
-          const row=buildRow(s.key,preds,games);
-          const diff=s.key!=='safe'?row.filter((v,i)=>v!==safeRow[i]).length:0;
-          return <div key={s.key} style={{background:'#fff',borderRadius:14,padding:16,marginBottom:12,border:`0.5px solid ${s.bc}44`}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-              <div style={{display:'flex',alignItems:'center',gap:9}}>
-                <div style={{width:34,height:34,borderRadius:9,background:s.bg,border:`0.5px solid ${s.bc}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{s.icon}</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:500}}>{s.title}</div>
-                  <span style={{fontSize:9,color:s.tc,background:s.bg,padding:'2px 7px',borderRadius:20,border:`0.5px solid ${s.bc}44`,fontWeight:500}}>{s.badge}</span>
-                </div>
-              </div>
-              <button onClick={()=>applyFill(s.key)} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',background:s.bc,color:'#fff',fontWeight:500,fontSize:11}}>החל ✓</button>
-            </div>
-            <div style={{background:'#fafafa',borderRadius:9,padding:'9px 11px'}}>
-              <div style={{fontSize:9,color:'#aaa',marginBottom:6,fontWeight:500}}>תצוגה מקדימה:</div>
-              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
-                {row.map((v,i)=><div key={i} style={{textAlign:'center'}}><div style={{fontSize:7,color:'#ccc',marginBottom:2}}>{i+1}</div><Cell v={v}/></div>)}
-              </div>
-            </div>
-            {s.key!=='safe'&&<div style={{marginTop:7,fontSize:10,color:'#aaa',textAlign:'center'}}>{diff} שינויים מהשורה הבטוחה</div>}
-          </div>;})}
-      </div>}
-
-      {tab==='picks'&&<div>
-        {autoMode&&<div style={{background:STRATS.find(s=>s.key===autoMode)?.bg,borderRadius:10,padding:'9px 14px',marginBottom:12,border:`0.5px solid ${STRATS.find(s=>s.key===autoMode)?.bc}44`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <div style={{fontSize:11,color:STRATS.find(s=>s.key===autoMode)?.tc,fontWeight:500}}>{STRATS.find(s=>s.key===autoMode)?.icon} {STRATS.find(s=>s.key===autoMode)?.title}</div>
-          <button onClick={()=>{setPicks({});setAuto(null)}} style={{background:'transparent',border:`0.5px solid ${STRATS.find(s=>s.key===autoMode)?.bc}44`,borderRadius:6,padding:'3px 9px',color:STRATS.find(s=>s.key===autoMode)?.tc,cursor:'pointer',fontSize:10}}>נקה</button>
-        </div>}
-        {games.map((g,i)=>{const p=preds[g.id],myP=picks[g.id];
-          return <div key={g.id} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:`0.5px solid ${myP?'#AFA9EC':'#e8e8f0'}`}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:7}}>
-              <span style={{fontSize:9,color:'#aaa'}}>#{i+1} · {g.league}</span>
-              {p&&<span style={{fontSize:9,color:p.confColor,fontWeight:500}}>ביטחון {p.conf}</span>}
-            </div>
-            <div style={{fontSize:12,fontWeight:500,textAlign:'center',marginBottom:9}}>{g.home} — {g.away}</div>
-            <div style={{display:'flex',gap:7}}>
-              {[['1','בית'],['X','תיקו'],['2','חוץ']].map(([v,lb])=>{const isAI=p?.pred===v,isPicked=myP===v;
-                return <button key={v} onClick={()=>setPick(g.id,v)} style={{flex:1,padding:'10px 4px',border:`0.5px solid ${isPicked?VC(v):'#e0e0e0'}`,borderRadius:10,cursor:'pointer',background:isPicked?VB(v):'#fafafa',color:isPicked?VC(v):'#aaa',fontWeight:isPicked?500:400,fontSize:16,position:'relative'}}>
-                  {isAI&&<div style={{position:'absolute',top:-7,right:-4,background:'#534AB7',borderRadius:4,padding:'1px 4px',fontSize:7,color:'#EEEDFE',fontWeight:500}}>AI</div>}
-                  {v}<div style={{fontSize:8,opacity:0.6,marginTop:2}}>{lb}</div>
-                  {p&&<div style={{fontSize:8,opacity:0.5}}>{v==='1'?p.win:v==='X'?p.draw:p.loss}%</div>}
-                </button>;})}
-            </div>
-          </div>;})}
-      </div>}
-
-      <AppNestBadge/>
-    </div>
-
-    {tab!=='rows'&&<div style={{position:'fixed',bottom:0,left:0,right:0,background:'linear-gradient(0deg,#f8f8fc 55%,transparent)',padding:'12px 13px 18px'}}>
-      <div style={{maxWidth:600,margin:'0 auto'}}>
-        <div style={{background:'#fff',borderRadius:10,padding:'8px 12px',border:'0.5px solid #e8e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div style={{fontSize:9,color:'#aaa'}}>🛡️ שורה בטוחה:</div>
-          <div style={{display:'flex',gap:2}}>{safeRow.map((v,i)=><Cell key={i} v={v} size={19}/>)}</div>
+    ${state.history.length===0?`<div style="text-align:center;padding:60px 20px;color:#aaa;font-size:13px;">אין היסטוריה עדיין.</div>`:''}
+    ${state.history.map((h,i)=>{
+      const dt=new Date(h.date);
+      return `<div class="card" onclick="loadHistoryEntry(${i})" style="cursor:pointer;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:13px;font-weight:500;">טופס ${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()}</div>
+          <div style="font-size:10px;color:#aaa;">${h.games?.length} משחקים</div>
         </div>
-      </div>
-    </div>}
-  </div>;
+        <div style="display:flex;gap:3px;flex-wrap:wrap;">${(h.safeRow||[]).map(v=>badge(v)).join('')}</div>
+      </div>`;
+    }).join('')}`;
 }
 
-// ── Root ──────────────────────────────────────────────────────
-function App(){
-  const [screen,setScreen]=useState('setup');
-  const [mode,setMode]=useState('ai');
-  const [games,setGames]=useState([]);
-  const [preds,setPreds]=useState({});
-  const [history,setHistory]=useState([]);
-  const [saved,setSaved]=useState(null);
-
-  useEffect(()=>{
-    setHistory(loadHistory());
-    const m=loadMode();if(m)setSaved(m);
-  },[]);
-
-  const handleSetup=m=>{setMode(m);saveMode(m);setScreen('enter');};
-  const handleGames=async entered=>{
-    setGames(entered);setScreen('loading');
-    const np={};
-    for(const g of entered){
-      try{
-        let hs=null,as=null;
-        if(mode==='ai')[hs,as]=await Promise.all([fetchStats(g.home,g.league),fetchStats(g.away,g.league)]);
-        np[g.id]=predict(hs,as);
-      }catch{np[g.id]=predict(null,null);}
-    }
-    setPreds(np);
-    const sr=buildRow('safe',np,entered);
-    const entry={date:new Date().toISOString(),games:entered,preds:np,safeRow:sr};
-    const updated=[entry,...history].slice(0,20);
-    setHistory(updated);saveHistory(updated);
-    setScreen('main');
-  };
-
-  return <>
-    {screen==='setup'&&<Setup saved={saved} onDone={handleSetup}/>}
-    {screen==='enter'&&<EnterGames onDone={handleGames} onHistory={()=>setScreen('history')}/>}
-    {screen==='loading'&&<Loading games={games}/>}
-    {screen==='main'&&<MainApp games={games} preds={preds} dataMode={mode} onNewForm={()=>setScreen('enter')} onHistory={()=>setScreen('history')}/>}
-    {screen==='history'&&<History history={history} onBack={()=>setScreen(games.length?'main':'enter')} onLoad={e=>{setGames(e.games);setPreds(e.preds||{});setScreen('main');}}/>}
-  </>;
+function loadHistoryEntry(i){
+  const entry=state.history[i];
+  state.games=[...entry.games];
+  state.preds={...entry.preds};
+  state.picks={};
+  state.screen='main';
+  state.tab='form';
+  document.querySelector('.tabs').style.display='flex';
+  render();
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+function renderAppNestBadge(){
+  return `<div class="appnest-badge" style="margin-top:16px;">
+    <a href="https://barakaflalo.github.io/appnest" target="_blank">
+      <svg width="28" height="28" viewBox="0 0 58 58"><polygon points="29,2 54,16 54,42 29,56 4,42 4,16" fill="#d4a853"/><polygon points="29,5 51,17.5 51,40.5 29,53 7,40.5 7,17.5" fill="#0a0a0a"/><ellipse cx="29" cy="19" rx="6.5" ry="6.5" fill="#e8e8e0"/><circle cx="31" cy="18" r="2" fill="#d4a853"/><path d="M33 20 L39 22 L33 24 Z" fill="#d4a853"/><path d="M22 26 Q12 20 8 24 Q10 30 18 29Z" fill="#222"/><path d="M36 26 Q46 20 50 24 Q48 30 40 29Z" fill="#222"/></svg>
+      <div style="flex:1;"><div style="font-size:13px;font-weight:700;color:#d4a853;">AppNest</div><div style="font-size:11px;color:#888;">עוד אפליקציות חינמיות ›</div></div>
+      <span style="color:#d4a853;font-size:16px;">›</span>
+    </a>
+  </div>`;
+}
+
+// ── Navigation ────────────────────────────────────────────────
+function switchTab(tab,btnEl){
+  state.tab=tab;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  if(btnEl) btnEl.classList.add('active');
+  else {
+    const tabs=[...document.querySelectorAll('.tab')];
+    const map={form:0,ai:1,rows:2,picks:3};
+    if(tabs[map[tab]]) tabs[map[tab]].classList.add('active');
+  }
+  render();
+}
+
+function showHistory(){state.screen='history';render();}
+function showEnter(){
+  state.screen='enter';
+  document.querySelector('.tabs').style.display='none';
+  render();
+}
+function backToMain(){
+  if(state.games.length){
+    state.screen='main';
+    document.querySelector('.tabs').style.display='flex';
+    render();
+  } else {
+    showEnter();
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────
+document.querySelector('.tabs').style.display='none';
+render();
 </script>
 </body>
 </html>
