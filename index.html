@@ -3,617 +3,526 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>טוטו אנליזר — AI</title>
+<title>טוטו אנליזר AI</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#f8f8fc;color:#1a1a2e;font-family:'Segoe UI',system-ui,sans-serif;direction:rtl;min-height:100vh;}
 input,select,button{font-family:inherit;}
 @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
-.fade-up{animation:fadeUp 0.4s ease both;}
+#root{min-height:100vh;}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.production.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.production.min.js"></script>
-<script>
-const {useState, useEffect, useCallback} = React;
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script type="text/babel">
+const {useState, useEffect} = React;
 
-// ============================================================
-// STORAGE (localStorage)
-// ============================================================
-function loadHistory(){try{const r=localStorage.getItem('toto_history');return r?JSON.parse(r):[];}catch{return [];}}
-function saveHistory(h){try{localStorage.setItem('toto_history',JSON.stringify(h));}catch{}}
-function loadMode(){try{return localStorage.getItem('toto_mode');}catch{return null;}}
-function saveMode(m){try{localStorage.setItem('toto_mode',m);}catch{}}
+// ── Storage ──────────────────────────────────────────────────
+function loadHistory(){try{const r=localStorage.getItem('toto_h');return r?JSON.parse(r):[]}catch{return[]}}
+function saveHistory(h){try{localStorage.setItem('toto_h',JSON.stringify(h))}catch{}}
+function loadMode(){try{return localStorage.getItem('toto_mode')}catch{return null}}
+function saveMode(m){try{localStorage.setItem('toto_mode',m)}catch{}}
 
-// ============================================================
-// PREDICTION ENGINE
-// ============================================================
+// ── Prediction Engine ─────────────────────────────────────────
 function formScore(form){
   if(!form?.length)return 0.5;
   const w=[0.35,0.25,0.2,0.12,0.08];let s=0;
-  form.forEach((r,i)=>{const wt=w[i]||0.05;s+=r===1?wt:r===2?wt*0.4:0;});
+  form.forEach((r,i)=>{const wt=w[i]||0.05;s+=r===1?wt:r===2?wt*0.4:0});
   return Math.min(1,s/0.7);
 }
-function predictFromData(hs,as_){
+function predict(hs,as_){
   const D={wins:40,draws:20,losses:40,form:[0,1,0,1,0],position:8,goalsFor:1.2,goalsAgainst:1.4};
-  const h={...D,...hs},a={...D,...as_};
+  const h={...D,...(hs||{})},a={...D,...(as_||{})};
   const ht=h.wins+h.draws+h.losses||1,at=a.wins+a.draws+a.losses||1;
-  const eloP=1/(1+Math.pow(10,-((1500+(16-(h.position||8))*40)-(1500+(16-(a.position||8))*40))/400));
-  const hS=(h.wins/ht)*0.25+formScore(h.form)*0.2+eloP*0.25+(h.goalsFor/1.5)*0.1+(1-h.goalsAgainst/2.5)*0.1+0.12;
-  const aS=(a.wins/at)*0.25+formScore(a.form)*0.2+(1-eloP)*0.25+(a.goalsFor/1.5)*0.1+(1-a.goalsAgainst/2.5)*0.1;
+  const elo=1/(1+Math.pow(10,-((16-(h.position||8))*40-(16-(a.position||8))*40)/400));
+  const hS=(h.wins/ht)*0.25+formScore(h.form)*0.2+elo*0.25+(h.goalsFor/1.5)*0.1+(1-h.goalsAgainst/2.5)*0.1+0.12;
+  const aS=(a.wins/at)*0.25+formScore(a.form)*0.2+(1-elo)*0.25+(a.goalsFor/1.5)*0.1+(1-a.goalsAgainst/2.5)*0.1;
   const dF=((h.draws/ht+a.draws/at)/2)*0.85;
   const tot=hS+aS+dF||1;
   const win=Math.round(hS/tot*100),loss=Math.round(aS/tot*100),draw=100-win-loss;
   const max=Math.max(win,draw,loss);
   const pred=win>=draw&&win>=loss?'1':draw>=win&&draw>=loss?'X':'2';
   const sorted=[{v:win,l:'1'},{v:draw,l:'X'},{v:loss,l:'2'}].sort((a,b)=>b.v-a.v);
-  const surprise=sorted[1].v>=26?sorted[1].l:sorted[2].l;
-  return{win,draw,loss,pred,surprise,max,
-    conf:max>55?'גבוהה':max>42?'בינונית':'נמוכה',
-    confColor:max>55?'#1D9E75':max>42?'#BA7517':'#A32D2D',
+  return{win,draw,loss,pred,max,surprise:sorted[1].v>=26?sorted[1].l:sorted[2].l,
+    conf:max>55?'גבוהה':max>42?'בינונית':'נמוכה',confColor:max>55?'#1D9E75':max>42?'#BA7517':'#A32D2D',
     hForm:h.form,aForm:a.form,hPos:h.position,aPos:a.position,hGf:h.goalsFor,aGf:a.goalsFor};
 }
 
-// ============================================================
-// AI CALLS
-// ============================================================
-async function callClaude(prompt,useSearch=true){
-  const body={model:'claude-sonnet-4-20250514',max_tokens:1000,
-    messages:[{role:'user',content:prompt}]};
-  if(useSearch)body.tools=[{type:'web_search_20250305',name:'web_search'}];
+// ── AI ────────────────────────────────────────────────────────
+async function callClaude(prompt){
   const res=await fetch('https://api.anthropic.com/v1/messages',{
-    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await res.json();
-  return data.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
+      tools:[{type:'web_search_20250305',name:'web_search'}],
+      messages:[{role:'user',content:prompt}]})});
+  const d=await res.json();
+  return d.content?.filter(b=>b.type==='text').map(b=>b.text).join('')||'';
 }
-
 async function fetchWeeklyGames(){
-  const text=await callClaude(
-    `Search toto.co.il for the current week's Toto (טוטו) Israel form. Find all 16 football matches.
-Return ONLY a JSON array, no markdown:
-[{"home":"שם קבוצה בעברית","away":"שם קבוצה בעברית","league":"שם הליגה בעברית"}]
-All 16 matches in order with Hebrew names.`);
+  const text=await callClaude(`Search toto.co.il for this week's Israeli Toto 16 matches. Return ONLY JSON array no markdown:
+[{"home":"קבוצה","away":"קבוצה","league":"ליגה"}] with all 16 matches in Hebrew.`);
   const m=text.match(/\[[\s\S]*?\]/);
-  if(m){const arr=JSON.parse(m[0]);if(Array.isArray(arr)&&arr.length>=10)return arr.slice(0,16).map((g,i)=>({id:i+1,...g}));}
+  if(m){const arr=JSON.parse(m[0]);if(Array.isArray(arr)&&arr.length>=10)return arr.slice(0,16).map((g,i)=>({id:i+1,...g}))}
   return null;
 }
-
-async function fetchTeamStats(teamName,league){
+async function fetchStats(name,league){
   try{
-    const text=await callClaude(
-      `Search sofascore.com, flashscore.co.il or one.co.il for 2024-2025 season stats for football team "${teamName}" in ${league||'football'}.
-Return ONLY JSON: {"wins":N,"draws":N,"losses":N,"position":N,"goalsFor":N,"goalsAgainst":N,"form":[1=win,2=draw,0=loss last 5]}`);
+    const text=await callClaude(`Search sofascore.com or one.co.il for 2024-2025 stats of "${name}" in ${league||'football'}.
+Return ONLY JSON: {"wins":N,"draws":N,"losses":N,"position":N,"goalsFor":N,"goalsAgainst":N,"form":[1,0,2,1,0]}`);
     const m=text.match(/\{[\s\S]*?\}/);if(m)return JSON.parse(m[0]);
-  }catch{}
-  return null;
+  }catch{}return null;
 }
 
-// ============================================================
-// UTILS
-// ============================================================
+// ── Utils ─────────────────────────────────────────────────────
 const VC=v=>v==='1'?'#1D9E75':v==='X'?'#BA7517':'#A32D2D';
 const VB=v=>v==='1'?'#E1F5EE':v==='X'?'#FAEEDA':'#FCEBEB';
-const fmtDate=d=>{const dt=new Date(d);return `${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()}`;};
+const fmtD=d=>{const dt=new Date(d);return`${dt.getDate()}/${dt.getMonth()+1}/${dt.getFullYear()}`};
 function buildRow(mode,preds,games){
   return games.map(g=>{
-    const p=preds[g.id];if(!p)return '?';
+    const p=preds[g.id];if(!p)return'?';
     if(mode==='safe')return p.pred;
     if(mode==='surprise')return p.surprise;
-    const s=[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].sort((a,b)=>b.v-a.v);
-    return p.max<50?s[1].l:s[0].l;
+    return p.max<50?[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].sort((a,b)=>b.v-a.v)[1].l:p.pred;
   });
 }
-const STRATEGIES=[
-  {key:'safe',icon:'🛡️',title:'שורה בטוחה',badge:'הכי בטוח',bc:'#1D9E75',bg:'#E1F5EE',tc:'#085041',desc:'האחוזים הגבוהים ביותר בכל משחק'},
-  {key:'surprise',icon:'⚡',title:'הפתעות סטטיסטיות',badge:'ריסק בינוני',bc:'#BA7517',bg:'#FAEEDA',tc:'#633806',desc:'תוצאות שנראות פחות צפויות אך מגובות בנתונים'},
-  {key:'bold',icon:'🔥',title:'שורה אגרסיבית',badge:'ריסק גבוה',bc:'#A32D2D',bg:'#FCEBEB',tc:'#501313',desc:'במשחקים לא-סגורים בוחר אופציה שנייה לרווח גבוה'},
+const STRATS=[
+  {key:'safe',icon:'🛡️',title:'שורה בטוחה',badge:'הכי בטוח',bc:'#1D9E75',bg:'#E1F5EE',tc:'#085041'},
+  {key:'surprise',icon:'⚡',title:'הפתעות',badge:'ריסק בינוני',bc:'#BA7517',bg:'#FAEEDA',tc:'#633806'},
+  {key:'bold',icon:'🔥',title:'אגרסיבי',badge:'ריסק גבוה',bc:'#A32D2D',bg:'#FCEBEB',tc:'#501313'},
 ];
 
-// ============================================================
-// SHARED UI
-// ============================================================
-function FormDots({form}){
-  return React.createElement('div',{style:{display:'flex',gap:3,justifyContent:'center'}},
-    (form||[]).map((r,i)=>React.createElement('div',{key:i,style:{width:7,height:7,borderRadius:'50%',
-      background:r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'}})));
+// ── Shared UI ─────────────────────────────────────────────────
+function Dots({form}){
+  return <div style={{display:'flex',gap:3}}>{(form||[]).map((r,i)=><div key={i} style={{width:7,height:7,borderRadius:'50%',background:r===1?'#1D9E75':r===2?'#BA7517':'#A32D2D'}}/>)}</div>;
 }
-function ProbBar({label,value,color}){
-  return React.createElement('div',{style:{flex:1,textAlign:'center'}},
-    React.createElement('div',{style:{fontSize:20,fontWeight:500,color,marginBottom:4}},value+'%'),
-    React.createElement('div',{style:{height:4,borderRadius:2,background:'#e0e0e0',overflow:'hidden',marginBottom:5}},
-      React.createElement('div',{style:{width:value+'%',height:'100%',background:color,transition:'width 0.8s ease'}})),
-    React.createElement('div',{style:{fontSize:10,color:'#888',fontWeight:500}},label));
+function Cell({v,size=22}){
+  return <div style={{width:size,height:size,borderRadius:5,background:VB(v),border:`0.5px solid ${VC(v)}66`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:size*0.45,fontWeight:500,color:VC(v)}}>{v}</div>;
 }
-function CellBadge({v,size=22}){
-  return React.createElement('div',{style:{width:size,height:size,borderRadius:5,background:VB(v),
-    border:`0.5px solid ${VC(v)}66`,display:'flex',alignItems:'center',justifyContent:'center',
-    fontSize:size*0.45,fontWeight:500,color:VC(v)}},v);
-}
-
-// AppNest Badge
 function AppNestBadge(){
-  return React.createElement('div',{style:{margin:'16px 14px 0',padding:'12px 14px',
-    background:'rgba(212,168,83,0.08)',border:'1px solid rgba(212,168,83,0.2)',borderRadius:12}},
-    React.createElement('a',{href:'https://barakaflalo.github.io/appnest',target:'_blank',
-      style:{display:'flex',alignItems:'center',gap:10,textDecoration:'none'}},
-      React.createElement('svg',{width:28,height:28,viewBox:'0 0 58 58',xmlns:'http://www.w3.org/2000/svg'},
-        React.createElement('polygon',{points:'29,2 54,16 54,42 29,56 4,42 4,16',fill:'#d4a853'}),
-        React.createElement('polygon',{points:'29,5 51,17.5 51,40.5 29,53 7,40.5 7,17.5',fill:'#0a0a0a'}),
-        React.createElement('ellipse',{cx:29,cy:46,rx:13,ry:4,fill:'#6B3A00'}),
-        React.createElement('ellipse',{cx:29,cy:45,rx:10,ry:3,fill:'#8B5E0A'}),
-        React.createElement('ellipse',{cx:24,cy:44,rx:3,ry:2.2,fill:'#d4c070'}),
-        React.createElement('ellipse',{cx:29,cy:43.5,rx:3,ry:2.2,fill:'#d4c070'}),
-        React.createElement('ellipse',{cx:34,cy:44,rx:3,ry:2.2,fill:'#d4c070'}),
-        React.createElement('ellipse',{cx:29,cy:30,rx:7,ry:8,fill:'#1e1e1e'}),
-        React.createElement('ellipse',{cx:29,cy:19,rx:6.5,ry:6.5,fill:'#e8e8e0'}),
-        React.createElement('circle',{cx:31,cy:18,r:2,fill:'#d4a853'}),
-        React.createElement('circle',{cx:31,cy:18,r:1,fill:'#0a0a0a'}),
-        React.createElement('path',{d:'M33 20 L39 22 L33 24 Z',fill:'#d4a853'}),
-        React.createElement('path',{d:'M22 26 Q12 20 8 24 Q10 30 18 29 Q20 28 22 30Z',fill:'#222'}),
-        React.createElement('path',{d:'M36 26 Q46 20 50 24 Q48 30 40 29 Q38 28 36 30Z',fill:'#222'}),
-        React.createElement('path',{d:'M24 39 Q29 44 34 39 Q31 42 29 40 Q27 42 24 39Z',fill:'#d0d0c8'})
-      ),
-      React.createElement('div',{style:{flex:1}},
-        React.createElement('div',{style:{fontSize:13,fontWeight:700,color:'#d4a853'}},'AppNest'),
-        React.createElement('div',{style:{fontSize:11,color:'#888'}},'עוד אפליקציות חינמיות מבית AppNest ›')
-      ),
-      React.createElement('span',{style:{color:'#d4a853',fontSize:16}},'›')
-    )
-  );
+  return <div style={{margin:'16px 14px 0',padding:'12px 14px',background:'rgba(212,168,83,0.08)',border:'1px solid rgba(212,168,83,0.2)',borderRadius:12}}>
+    <a href="https://barakaflalo.github.io/appnest" target="_blank" style={{display:'flex',alignItems:'center',gap:10,textDecoration:'none'}}>
+      <svg width="28" height="28" viewBox="0 0 58 58"><polygon points="29,2 54,16 54,42 29,56 4,42 4,16" fill="#d4a853"/><polygon points="29,5 51,17.5 51,40.5 29,53 7,40.5 7,17.5" fill="#0a0a0a"/><ellipse cx="29" cy="19" rx="6.5" ry="6.5" fill="#e8e8e0"/><circle cx="31" cy="18" r="2" fill="#d4a853"/><path d="M33 20 L39 22 L33 24 Z" fill="#d4a853"/><path d="M22 26 Q12 20 8 24 Q10 30 18 29Z" fill="#222"/><path d="M36 26 Q46 20 50 24 Q48 30 40 29Z" fill="#222"/></svg>
+      <div style={{flex:1}}>
+        <div style={{fontSize:13,fontWeight:700,color:'#d4a853'}}>AppNest</div>
+        <div style={{fontSize:11,color:'#888'}}>עוד אפליקציות חינמיות מבית AppNest ›</div>
+      </div>
+      <span style={{color:'#d4a853',fontSize:16}}>›</span>
+    </a>
+  </div>;
 }
 
-// ============================================================
-// SCREEN: SETUP
-// ============================================================
-function SetupScreen({savedMode,onDone}){
-  const [apiKey,setApiKey]=useState('');
-  const [showApi,setShowApi]=useState(false);
-  return React.createElement('div',{style:{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',
-    alignItems:'center',justifyContent:'center',padding:24,direction:'rtl'}},
-    React.createElement('div',{style:{width:52,height:52,borderRadius:14,background:'#534AB7',
-      display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:14,color:'#EEEDFE'}},'⚽'),
-    React.createElement('div',{style:{fontSize:22,fontWeight:500,color:'#1a1a2e',marginBottom:4}},'טוטו אנליזר'),
-    React.createElement('div',{style:{fontSize:11,color:'#534AB7',marginBottom:32,fontWeight:500,letterSpacing:1}},'מנוע חיזוי AI'),
-    React.createElement('div',{style:{width:'100%',maxWidth:380}},
-      savedMode&&React.createElement('div',{style:{background:'#EEEDFE',borderRadius:12,padding:'10px 16px',marginBottom:14,
-        border:'0.5px solid #AFA9EC',textAlign:'center'}},
-        React.createElement('div',{style:{fontSize:11,color:'#534AB7',marginBottom:6}},
-          'ברוך הבא חזרה! מצב שמור: '+(savedMode==='ai'?'🤖 AI':'🔑 API')),
-        React.createElement('button',{onClick:()=>onDone(savedMode),style:{width:'100%',padding:10,borderRadius:10,
-          border:'none',background:'#534AB7',color:'#EEEDFE',fontWeight:500,cursor:'pointer',fontSize:13}},'המשך ←')
-      ),
-      !showApi?React.createElement('div',null,
-        React.createElement('button',{onClick:()=>onDone('ai'),style:{width:'100%',padding:'16px 18px',marginBottom:10,
-          borderRadius:14,background:'#fff',border:'0.5px solid #AFA9EC',color:'#1a1a2e',cursor:'pointer',textAlign:'right'}},
-          React.createElement('div',{style:{fontSize:15,marginBottom:3,fontWeight:500}},
-            '🤖 מצב AI ',
-            React.createElement('span',{style:{fontSize:9,color:'#534AB7',background:'#EEEDFE',padding:'2px 8px',borderRadius:6,marginRight:8}},'מומלץ')),
-          React.createElement('div',{style:{fontSize:11,color:'#888'}},'Claude מחפש נתונים מ-one.co.il, sofascore ו-flashscore')
-        ),
-        React.createElement('button',{onClick:()=>setShowApi(true),style:{width:'100%',padding:'16px 18px',
-          borderRadius:14,background:'#fff',border:'0.5px solid #e0e0e0',color:'#1a1a2e',cursor:'pointer',textAlign:'right'}},
-          React.createElement('div',{style:{fontSize:15,marginBottom:3,fontWeight:500}},'🔑 API-Football Key'),
-          React.createElement('div',{style:{fontSize:11,color:'#888'}},'מפתח מ-RapidAPI לנתונים מהירים')
-        ),
-        React.createElement(AppNestBadge)
-      ):React.createElement('div',null,
-        React.createElement('button',{onClick:()=>setShowApi(false),style:{background:'none',border:'none',color:'#888',cursor:'pointer',marginBottom:14,fontSize:12}},'← חזרה'),
-        React.createElement('div',{style:{background:'#f5f5f5',borderRadius:10,padding:14,marginBottom:12,fontSize:11,color:'#666',lineHeight:1.8}},
-          '1. כנס ל-rapidapi.com',React.createElement('br'),
-          '2. חפש "API-Football"',React.createElement('br'),
-          '3. Subscribe → Basic (חינם)',React.createElement('br'),
-          '4. העתק X-RapidAPI-Key'),
-        React.createElement('input',{placeholder:'הכנס API Key...',value:apiKey,onChange:e=>setApiKey(e.target.value),
-          style:{width:'100%',padding:'12px 14px',borderRadius:10,border:'0.5px solid #ccc',
-            background:'#fff',color:'#1a1a2e',fontSize:12,marginBottom:12,direction:'ltr',outline:'none'}}),
-        React.createElement('button',{onClick:()=>apiKey.trim()&&onDone('apikey',apiKey.trim()),disabled:!apiKey.trim(),
-          style:{width:'100%',padding:14,borderRadius:12,border:'none',
-            background:apiKey.trim()?'#534AB7':'#e0e0e0',color:apiKey.trim()?'#fff':'#aaa',
-            fontWeight:500,cursor:apiKey.trim()?'pointer':'default',fontSize:14}},'התחבר ←')
-      )
-    )
-  );
+// ── Setup Screen ──────────────────────────────────────────────
+function Setup({saved,onDone}){
+  const [key,setKey]=useState('');const [showKey,setShowKey]=useState(false);
+  return <div style={{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
+    <div style={{width:52,height:52,borderRadius:14,background:'#534AB7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:26,marginBottom:14,color:'#EEEDFE'}}>⚽</div>
+    <div style={{fontSize:22,fontWeight:500,marginBottom:4}}>טוטו אנליזר</div>
+    <div style={{fontSize:11,color:'#534AB7',marginBottom:28,fontWeight:500,letterSpacing:1}}>מנוע חיזוי AI</div>
+    <div style={{width:'100%',maxWidth:360}}>
+      {saved&&<div style={{background:'#EEEDFE',borderRadius:12,padding:'10px 16px',marginBottom:12,border:'0.5px solid #AFA9EC',textAlign:'center'}}>
+        <div style={{fontSize:11,color:'#534AB7',marginBottom:6}}>ברוך הבא! מצב שמור: {saved==='ai'?'🤖 AI':'🔑 API'}</div>
+        <button onClick={()=>onDone(saved)} style={{width:'100%',padding:10,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer'}}>המשך ←</button>
+      </div>}
+      {!showKey?<>
+        <button onClick={()=>onDone('ai')} style={{width:'100%',padding:'16px 18px',marginBottom:10,borderRadius:14,background:'#fff',border:'0.5px solid #AFA9EC',cursor:'pointer',textAlign:'right'}}>
+          <div style={{fontSize:15,fontWeight:500,marginBottom:3}}>🤖 מצב AI <span style={{fontSize:9,color:'#534AB7',background:'#EEEDFE',padding:'2px 8px',borderRadius:6,marginRight:8}}>מומלץ</span></div>
+          <div style={{fontSize:11,color:'#888'}}>Claude מחפש נתונים מ-sofascore ו-one.co.il</div>
+        </button>
+        <button onClick={()=>setShowKey(true)} style={{width:'100%',padding:'16px 18px',borderRadius:14,background:'#fff',border:'0.5px solid #e0e0e0',cursor:'pointer',textAlign:'right'}}>
+          <div style={{fontSize:15,fontWeight:500,marginBottom:3}}>🔑 API Key</div>
+          <div style={{fontSize:11,color:'#888'}}>מפתח מ-RapidAPI</div>
+        </button>
+        <AppNestBadge/>
+      </>:<div>
+        <button onClick={()=>setShowKey(false)} style={{background:'none',border:'none',color:'#888',cursor:'pointer',marginBottom:12,fontSize:12}}>← חזרה</button>
+        <input placeholder="הכנס API Key..." value={key} onChange={e=>setKey(e.target.value)}
+          style={{width:'100%',padding:'12px 14px',borderRadius:10,border:'0.5px solid #ccc',background:'#fff',fontSize:12,marginBottom:12,direction:'ltr',outline:'none'}}/>
+        <button onClick={()=>key.trim()&&onDone('apikey',key.trim())} disabled={!key.trim()}
+          style={{width:'100%',padding:14,borderRadius:12,border:'none',background:key.trim()?'#534AB7':'#e0e0e0',color:key.trim()?'#fff':'#aaa',fontWeight:500,cursor:key.trim()?'pointer':'default'}}>התחבר ←</button>
+      </div>}
+    </div>
+  </div>;
 }
 
-// ============================================================
-// SCREEN: ENTER GAMES
-// ============================================================
-function EnterGamesScreen({onDone,onHistory}){
-  const empty=()=>Array.from({length:16},(_,i)=>({id:i+1,home:'',away:'',league:''}));
-  const [games,setGames]=useState(empty());
+// ── Enter Games Screen ────────────────────────────────────────
+function EnterGames({onDone,onHistory}){
+  const [games,setGames]=useState(()=>Array.from({length:16},(_,i)=>({id:i+1,home:'',away:'',league:''})));
   const [loading,setLoading]=useState(false);
-  const [autoLoading,setAutoLoading]=useState(false);
-  const [autoStatus,setAutoStatus]=useState('');
-  const [autoError,setAutoError]=useState('');
+  const [autoLoad,setAutoLoad]=useState(false);
+  const [autoMsg,setAutoMsg]=useState('');
+  const [autoErr,setAutoErr]=useState('');
   const filled=games.filter(g=>g.home.trim()&&g.away.trim()).length;
   const upd=(id,f,v)=>setGames(p=>p.map(g=>g.id===id?{...g,[f]:v}:g));
-  const handleAutoLoad=async()=>{
-    setAutoLoading(true);setAutoError('');setAutoStatus('מחפש את הטופס השבועי ב-toto.co.il...');
+  const LEAGUES=['ליגת העל','פרמייר ליג','לה ליגה','בונדסליגה','סריה א','ליג 1','ארדיביזי','ליגת האלופות','אחר'];
+
+  const handleAuto=async()=>{
+    setAutoLoad(true);setAutoErr('');setAutoMsg('מחפש ב-toto.co.il...');
     try{
       const found=await fetchWeeklyGames();
-      if(found&&found.length>=10){
-        setAutoStatus(`נמצאו ${found.length} משחקים! ✓`);
-        const filled2=found.length===16?found:[...found,...Array.from({length:16-found.length},(_,i)=>({id:found.length+i+1,home:'',away:'',league:''}))];
-        setGames(filled2);setTimeout(()=>setAutoStatus(''),3000);
-      }else{setAutoError('לא הצלחתי למצוא את הטופס אוטומטית — אנא הכנס ידנית');setAutoStatus('');}
-    }catch{setAutoError('שגיאה בטעינה — אנא הכנס ידנית');setAutoStatus('');}
-    setAutoLoading(false);
+      if(found?.length>=10){
+        setAutoMsg(`✓ נמצאו ${found.length} משחקים!`);
+        setGames(found.length===16?found:[...found,...Array.from({length:16-found.length},(_,i)=>({id:found.length+i+1,home:'',away:'',league:''}))]);
+        setTimeout(()=>setAutoMsg(''),3000);
+      }else{setAutoErr('לא נמצא — הכנס ידנית');setAutoMsg('');}
+    }catch{setAutoErr('שגיאה — הכנס ידנית');setAutoMsg('');}
+    setAutoLoad(false);
   };
-  const LEAGUES=['ליגת העל','פרמייר ליג','לה ליגה','בונדסליגה','סריה א','ליג 1','ארדיביזי','ליגת האלופות','אחר'];
-  return React.createElement('div',{style:{minHeight:'100vh',background:'#f8f8fc',direction:'rtl',color:'#1a1a2e'}},
-    React.createElement('div',{style:{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 16px 12px',
-      position:'sticky',top:0,zIndex:100}},
-      React.createElement('div',{style:{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between'}},
-        React.createElement('div',null,
-          React.createElement('div',{style:{fontSize:15,fontWeight:500}},'📋 הכנסת טופס'),
-          React.createElement('div',{style:{fontSize:10,color:'#888',marginTop:1}},'מאתר הטוטו — toto.co.il')),
-        React.createElement('div',{style:{display:'flex',gap:8,alignItems:'center'}},
-          React.createElement('button',{onClick:onHistory,style:{background:'#f5f5f5',border:'0.5px solid #e0e0e0',
-            borderRadius:8,padding:'6px 12px',color:'#888',cursor:'pointer',fontSize:11}},'📚 היסטוריה'),
-          React.createElement('div',{style:{textAlign:'center'}},
-            React.createElement('div',{style:{fontSize:9,color:'#aaa'}},'הוכנסו'),
-            React.createElement('div',{style:{fontSize:18,fontWeight:500,color:filled===16?'#1D9E75':'#1a1a2e'}},
-              filled,React.createElement('span',{style:{fontSize:11,color:'#aaa'}},'/16')))))),
-    React.createElement('div',{style:{maxWidth:600,margin:'0 auto',padding:'14px 14px 130px'}},
-      React.createElement('div',{style:{background:'#fff',borderRadius:14,padding:16,marginBottom:14,
-        border:'0.5px solid #AFA9EC',boxShadow:'0 2px 12px #534AB711'}},
-        React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:10}},
-          React.createElement('div',{style:{width:36,height:36,borderRadius:10,background:'#EEEDFE',
-            display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}},'🤖'),
-          React.createElement('div',null,
-            React.createElement('div',{style:{fontSize:13,fontWeight:500}},'טעינה אוטומטית של הטופס'),
-            React.createElement('div',{style:{fontSize:11,color:'#888'}},'Claude יחפש את 16 המשחקים ב-toto.co.il'))),
-        React.createElement('button',{onClick:handleAutoLoad,disabled:autoLoading,
-          style:{width:'100%',padding:12,borderRadius:10,border:'none',
-            background:autoLoading?'#e0e0e0':'#534AB7',color:autoLoading?'#aaa':'#fff',
-            fontWeight:500,cursor:autoLoading?'default':'pointer',fontSize:13}},
-          autoLoading?'⏳ מחפש את הטופס השבועי...':'✨ טען טופס שבועי אוטומטית'),
-        autoStatus&&React.createElement('div',{style:{marginTop:8,padding:'8px 12px',background:'#E1F5EE',borderRadius:8,fontSize:11,color:'#085041',fontWeight:500,textAlign:'center'}},autoStatus),
-        autoError&&React.createElement('div',{style:{marginTop:8,padding:'8px 12px',background:'#FCEBEB',borderRadius:8,fontSize:11,color:'#501313',textAlign:'center'}},autoError)
-      ),
-      React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10,marginBottom:14}},
-        React.createElement('div',{style:{flex:1,height:'0.5px',background:'#e0e0e0'}}),
-        React.createElement('div',{style:{fontSize:11,color:'#aaa'}},'או הכנס ידנית'),
-        React.createElement('div',{style:{flex:1,height:'0.5px',background:'#e0e0e0'}})),
-      React.createElement('div',{style:{background:'#EEEDFE',borderRadius:10,padding:'10px 14px',marginBottom:14,
-        border:'0.5px solid #AFA9EC',fontSize:11,color:'#534AB7',lineHeight:1.8}},
-        '💡 כנס ל-toto.co.il לראות את 16 המשחקים · נתונים מ-one.co.il · sofascore · flashscore'),
-      games.map((g,i)=>React.createElement('div',{key:g.id,style:{background:'#fff',borderRadius:12,padding:'11px 12px',
-        marginBottom:7,border:`0.5px solid ${g.home&&g.away?'#AFA9EC':'#e8e8f0'}`}},
-        React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
-          React.createElement('div',{style:{fontSize:9,color:'#aaa',fontWeight:500}},`משחק #${i+1}`),
-          React.createElement('select',{value:g.league,onChange:e=>upd(g.id,'league',e.target.value),
-            style:{background:'#f5f5f5',border:'none',color:'#888',fontSize:10,borderRadius:6,padding:'3px 6px',cursor:'pointer'}},
-            React.createElement('option',{value:''},'ליגה...'),
-            LEAGUES.map(l=>React.createElement('option',{key:l},l)))),
-        React.createElement('div',{style:{display:'flex',gap:7,alignItems:'center'}},
-          React.createElement('input',{placeholder:'קבוצת בית',value:g.home,onChange:e=>upd(g.id,'home',e.target.value),
-            style:{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.home?'#AFA9EC':'#e0e0e0'}`,
-              background:'#fafafa',color:'#1a1a2e',fontSize:12,outline:'none'}}),
-          React.createElement('div',{style:{fontSize:10,color:'#ccc',fontWeight:500}},'VS'),
-          React.createElement('input',{placeholder:'קבוצת חוץ',value:g.away,onChange:e=>upd(g.id,'away',e.target.value),
-            style:{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.away?'#AFA9EC':'#e0e0e0'}`,
-              background:'#fafafa',color:'#1a1a2e',fontSize:12,outline:'none'}}))))
-    ),
-    React.createElement('div',{style:{position:'fixed',bottom:0,left:0,right:0,
-      background:'linear-gradient(0deg,#f8f8fc 60%,transparent)',padding:'14px 14px 22px'}},
-      React.createElement('div',{style:{maxWidth:600,margin:'0 auto'}},
-        React.createElement('button',{
-          onClick:()=>{if(filled<16)return;setLoading(true);onDone(games.filter(g=>g.home.trim()&&g.away.trim()));},
-          disabled:filled<16||loading,
-          style:{width:'100%',padding:16,borderRadius:13,border:'none',
-            background:filled===16?'#534AB7':'#e0e0e0',color:filled===16?'#fff':'#aaa',
-            fontWeight:500,fontSize:14,cursor:filled===16?'pointer':'default'}},
-          loading?'⏳ טוען...':filled<16?`עוד ${16-filled} משחקים...`:'🤖 נתח את הטופס ←')))
-  );
+
+  return <div style={{minHeight:'100vh',background:'#f8f8fc'}}>
+    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 16px 12px',position:'sticky',top:0,zIndex:100}}>
+      <div style={{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div>
+          <div style={{fontSize:15,fontWeight:500}}>📋 הכנסת טופס</div>
+          <div style={{fontSize:10,color:'#888'}}>מ-toto.co.il</div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={onHistory} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:8,padding:'6px 12px',color:'#888',cursor:'pointer',fontSize:11}}>📚 היסטוריה</button>
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:9,color:'#aaa'}}>הוכנסו</div>
+            <div style={{fontSize:18,fontWeight:500,color:filled===16?'#1D9E75':'#1a1a2e'}}>{filled}<span style={{fontSize:11,color:'#aaa'}}>/16</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style={{maxWidth:600,margin:'0 auto',padding:'14px 14px 130px'}}>
+      <div style={{background:'#fff',borderRadius:14,padding:16,marginBottom:14,border:'0.5px solid #AFA9EC'}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
+          <div style={{width:36,height:36,borderRadius:10,background:'#EEEDFE',display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>🤖</div>
+          <div>
+            <div style={{fontSize:13,fontWeight:500}}>טעינה אוטומטית</div>
+            <div style={{fontSize:11,color:'#888'}}>Claude יחפש את 16 המשחקים</div>
+          </div>
+        </div>
+        <button onClick={handleAuto} disabled={autoLoad} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:autoLoad?'#e0e0e0':'#534AB7',color:autoLoad?'#aaa':'#fff',fontWeight:500,cursor:autoLoad?'default':'pointer',fontSize:13}}>
+          {autoLoad?'⏳ מחפש...':'✨ טען טופס שבועי אוטומטית'}
+        </button>
+        {autoMsg&&<div style={{marginTop:8,padding:'8px 12px',background:'#E1F5EE',borderRadius:8,fontSize:11,color:'#085041',textAlign:'center'}}>{autoMsg}</div>}
+        {autoErr&&<div style={{marginTop:8,padding:'8px 12px',background:'#FCEBEB',borderRadius:8,fontSize:11,color:'#501313',textAlign:'center'}}>{autoErr}</div>}
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
+        <div style={{flex:1,height:'0.5px',background:'#e0e0e0'}}/>
+        <div style={{fontSize:11,color:'#aaa'}}>או הכנס ידנית</div>
+        <div style={{flex:1,height:'0.5px',background:'#e0e0e0'}}/>
+      </div>
+      <div style={{background:'#EEEDFE',borderRadius:10,padding:'10px 14px',marginBottom:14,border:'0.5px solid #AFA9EC',fontSize:11,color:'#534AB7',lineHeight:1.8}}>
+        💡 כנס ל-<strong>toto.co.il</strong> · נתונים מ-<strong>one.co.il · sofascore · flashscore</strong>
+      </div>
+      {games.map((g,i)=><div key={g.id} style={{background:'#fff',borderRadius:12,padding:'11px 12px',marginBottom:7,border:`0.5px solid ${g.home&&g.away?'#AFA9EC':'#e8e8f0'}`}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{fontSize:9,color:'#aaa'}}>משחק #{i+1}</div>
+          <select value={g.league} onChange={e=>upd(g.id,'league',e.target.value)} style={{background:'#f5f5f5',border:'none',color:'#888',fontSize:10,borderRadius:6,padding:'3px 6px'}}>
+            <option value="">ליגה...</option>
+            {LEAGUES.map(l=><option key={l}>{l}</option>)}
+          </select>
+        </div>
+        <div style={{display:'flex',gap:7,alignItems:'center'}}>
+          <input placeholder="קבוצת בית" value={g.home} onChange={e=>upd(g.id,'home',e.target.value)}
+            style={{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.home?'#AFA9EC':'#e0e0e0'}`,background:'#fafafa',fontSize:12,outline:'none',color:'#1a1a2e'}}/>
+          <div style={{fontSize:10,color:'#ccc',fontWeight:500}}>VS</div>
+          <input placeholder="קבוצת חוץ" value={g.away} onChange={e=>upd(g.id,'away',e.target.value)}
+            style={{flex:1,padding:'9px 11px',borderRadius:9,border:`0.5px solid ${g.away?'#AFA9EC':'#e0e0e0'}`,background:'#fafafa',fontSize:12,outline:'none',color:'#1a1a2e'}}/>
+        </div>
+      </div>)}
+    </div>
+    <div style={{position:'fixed',bottom:0,left:0,right:0,background:'linear-gradient(0deg,#f8f8fc 60%,transparent)',padding:'14px 14px 22px'}}>
+      <div style={{maxWidth:600,margin:'0 auto'}}>
+        <button onClick={()=>{if(filled<16||loading)return;setLoading(true);onDone(games.filter(g=>g.home.trim()&&g.away.trim()));}} disabled={filled<16||loading}
+          style={{width:'100%',padding:16,borderRadius:13,border:'none',background:filled===16?'#534AB7':'#e0e0e0',color:filled===16?'#fff':'#aaa',fontWeight:500,fontSize:14,cursor:filled===16?'pointer':'default'}}>
+          {loading?'⏳ טוען...':filled<16?`עוד ${16-filled} משחקים...`:'🤖 נתח את הטופס ←'}
+        </button>
+      </div>
+    </div>
+  </div>;
 }
 
-// ============================================================
-// SCREEN: LOADING
-// ============================================================
-function LoadingScreen({games}){
-  const steps=['מחפש נתוני קבוצות...','טוען היסטוריה ותוצאות...','מחשב ELO ופורם...','בונה תחזיות...','מכין שורות מומלצות...'];
+// ── Loading Screen ────────────────────────────────────────────
+function Loading({games}){
+  const steps=['מחפש נתוני קבוצות...','טוען תוצאות...','מחשב ELO...','בונה תחזיות...','מכין שורות...'];
   const [step,setStep]=useState(0);
-  useEffect(()=>{const t=setInterval(()=>setStep(s=>Math.min(s+1,steps.length-1)),1000);return()=>clearInterval(t);},[]);
-  return React.createElement('div',{style:{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',
-    alignItems:'center',justifyContent:'center',direction:'rtl',padding:24}},
-    React.createElement('div',{style:{fontSize:52,marginBottom:16,animation:'spin 2s linear infinite'}},'⚙️'),
-    React.createElement('div',{style:{fontSize:15,fontWeight:500,color:'#534AB7',marginBottom:6}},`מנתח ${games.length} משחקים`),
-    React.createElement('div',{style:{fontSize:12,color:'#aaa',marginBottom:28}},steps[step]),
-    React.createElement('div',{style:{width:260}},
-      games.slice(0,6).map((g,i)=>React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',
-        padding:'4px 0',borderBottom:'0.5px solid #e8e8f0',fontSize:11}},
-        React.createElement('span',{style:{color:i<=step*3?'#534AB7':'#ccc'}},g.home),
-        React.createElement('span',{style:{color:'#ddd'}},'vs'),
-        React.createElement('span',{style:{color:i<=step*3?'#534AB7':'#ccc'}},g.away))),
-      games.length>6&&React.createElement('div',{style:{fontSize:10,color:'#ccc',textAlign:'center',paddingTop:5}},`+${games.length-6} משחקים נוספים`))
-  );
+  useEffect(()=>{const t=setInterval(()=>setStep(s=>Math.min(s+1,4)),1200);return()=>clearInterval(t);},[]);
+  return <div style={{minHeight:'100vh',background:'#f8f8fc',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:24}}>
+    <div style={{fontSize:52,marginBottom:16,animation:'spin 2s linear infinite'}}>⚙️</div>
+    <div style={{fontSize:15,fontWeight:500,color:'#534AB7',marginBottom:6}}>מנתח {games.length} משחקים</div>
+    <div style={{fontSize:12,color:'#aaa',marginBottom:28}}>{steps[step]}</div>
+    <div style={{width:260}}>
+      {games.slice(0,6).map((g,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'4px 0',borderBottom:'0.5px solid #e8e8f0',fontSize:11}}>
+        <span style={{color:i<=step*3?'#534AB7':'#ccc'}}>{g.home}</span>
+        <span style={{color:'#ddd'}}>vs</span>
+        <span style={{color:i<=step*3?'#534AB7':'#ccc'}}>{g.away}</span>
+      </div>)}
+    </div>
+  </div>;
 }
 
-// ============================================================
-// SCREEN: HISTORY
-// ============================================================
-function HistoryScreen({history,onBack,onLoad}){
+// ── History Screen ────────────────────────────────────────────
+function History({history,onBack,onLoad}){
   const [sel,setSel]=useState(null);
   const entry=sel!=null?history[sel]:null;
-  return React.createElement('div',{style:{minHeight:'100vh',background:'#f8f8fc',direction:'rtl',color:'#1a1a2e'}},
-    React.createElement('div',{style:{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 14px',position:'sticky',top:0}},
-      React.createElement('div',{style:{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',gap:12}},
-        React.createElement('button',{onClick:sel!=null?()=>setSel(null):onBack,
-          style:{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:8,padding:'7px 13px',color:'#888',cursor:'pointer',fontSize:12}},'←'),
-        React.createElement('div',{style:{fontSize:15,fontWeight:500}},'📚 היסטוריית טפסים'),
-        React.createElement('div',{style:{fontSize:11,color:'#aaa'}},history.length+' טפסים'))),
-    React.createElement('div',{style:{maxWidth:600,margin:'0 auto',padding:'14px 13px 40px'}},
-      !entry&&React.createElement('div',null,
-        history.length===0&&React.createElement('div',{style:{textAlign:'center',padding:'60px 20px',color:'#aaa',fontSize:13}},'אין היסטוריה עדיין.'),
-        history.map((h,i)=>React.createElement('div',{key:i,onClick:()=>setSel(i),
-          style:{background:'#fff',borderRadius:13,padding:'13px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}},
-          React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}},
-            React.createElement('div',{style:{fontSize:13,fontWeight:500}},`טופס ${fmtDate(h.date)}`),
-            React.createElement('div',{style:{fontSize:10,color:'#aaa'}},h.games?.length+' משחקים')),
-          React.createElement('div',{style:{display:'flex',gap:3,flexWrap:'wrap'}},
-            h.safeRow?.map((v,j)=>React.createElement(CellBadge,{key:j,v})))))),
-      entry&&React.createElement('div',null,
-        React.createElement('div',{style:{background:'#fff',borderRadius:14,padding:16,marginBottom:14,border:'0.5px solid #e8e8f0'}},
-          React.createElement('div',{style:{fontSize:12,color:'#534AB7',fontWeight:500,marginBottom:10}},'🛡️ שורה בטוחה'),
-          React.createElement('div',{style:{display:'flex',gap:4,flexWrap:'wrap'}},
-            entry.safeRow?.map((v,j)=>React.createElement('div',{key:j,style:{textAlign:'center'}},
-              React.createElement('div',{style:{fontSize:8,color:'#aaa',marginBottom:2}},j+1),
-              React.createElement(CellBadge,{v,size:24}))))),
-        React.createElement('button',{onClick:()=>onLoad(entry),style:{width:'100%',padding:14,borderRadius:12,border:'none',
-          background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}},'טען טופס זה מחדש ←')))
-  );
+  return <div style={{minHeight:'100vh',background:'#f8f8fc'}}>
+    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 14px',position:'sticky',top:0}}>
+      <div style={{maxWidth:600,margin:'0 auto',display:'flex',alignItems:'center',gap:12}}>
+        <button onClick={sel!=null?()=>setSel(null):onBack} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:8,padding:'7px 13px',color:'#888',cursor:'pointer',fontSize:12}}>←</button>
+        <div style={{fontSize:15,fontWeight:500}}>📚 היסטוריה</div>
+        <div style={{fontSize:11,color:'#aaa'}}>{history.length} טפסים</div>
+      </div>
+    </div>
+    <div style={{maxWidth:600,margin:'0 auto',padding:'14px 13px 40px'}}>
+      {!entry&&<>
+        {history.length===0&&<div style={{textAlign:'center',padding:'60px 20px',color:'#aaa',fontSize:13}}>אין היסטוריה עדיין.</div>}
+        {history.map((h,i)=><div key={i} onClick={()=>setSel(i)} style={{background:'#fff',borderRadius:13,padding:'13px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+            <div style={{fontSize:13,fontWeight:500}}>טופס {fmtD(h.date)}</div>
+            <div style={{fontSize:10,color:'#aaa'}}>{h.games?.length} משחקים</div>
+          </div>
+          <div style={{display:'flex',gap:3,flexWrap:'wrap'}}>{h.safeRow?.map((v,j)=><Cell key={j} v={v}/>)}</div>
+        </div>)}
+      </>}
+      {entry&&<>
+        <div style={{background:'#fff',borderRadius:14,padding:16,marginBottom:14,border:'0.5px solid #e8e8f0'}}>
+          <div style={{fontSize:12,color:'#534AB7',fontWeight:500,marginBottom:10}}>🛡️ שורה בטוחה</div>
+          <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+            {entry.safeRow?.map((v,j)=><div key={j} style={{textAlign:'center'}}>
+              <div style={{fontSize:8,color:'#aaa',marginBottom:2}}>{j+1}</div>
+              <Cell v={v} size={24}/>
+            </div>)}
+          </div>
+        </div>
+        <button onClick={()=>onLoad(entry)} style={{width:'100%',padding:14,borderRadius:12,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>טען טופס זה מחדש ←</button>
+      </>}
+    </div>
+  </div>;
 }
 
-// ============================================================
-// SCREEN: MAIN APP
-// ============================================================
-function MainApp({games,preds,dataMode,onNewForm,onHistory,onCompare}){
+// ── Main App ──────────────────────────────────────────────────
+function MainApp({games,preds,dataMode,onNewForm,onHistory}){
   const [tab,setTab]=useState('form');
   const [sel,setSel]=useState(null);
-  const [userPicks,setPicks]=useState({});
+  const [picks,setPicks]=useState({});
   const [autoMode,setAuto]=useState(null);
-  const picksCount=Object.values(userPicks).filter(Boolean).length;
+  const cnt=Object.values(picks).filter(Boolean).length;
   const setPick=(id,v)=>setPicks(p=>({...p,[id]:p[id]===v?null:v}));
-  const applyFill=(mode)=>{
+  const applyFill=mode=>{
     const row=buildRow(mode,preds,games);
-    const np={};games.forEach((g,i)=>{np[g.id]=row[i];});
+    const np={};games.forEach((g,i)=>{np[g.id]=row[i]});
     setPicks(np);setAuto(mode);setTab('picks');
   };
   const safeRow=buildRow('safe',preds,games);
-  const surpriseRow=buildRow('surprise',preds,games);
-  const boldRow=buildRow('bold',preds,games);
   const selP=sel?preds[sel.id]:null;
 
-  return React.createElement('div',{style:{background:'#f8f8fc',minHeight:'100vh',direction:'rtl',color:'#1a1a2e'}},
-    // HEADER
-    React.createElement('div',{style:{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'14px 14px 0',
-      position:'sticky',top:0,zIndex:100}},
-      React.createElement('div',{style:{maxWidth:600,margin:'0 auto'}},
-        React.createElement('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}},
-          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:9}},
-            React.createElement('div',{style:{width:34,height:34,borderRadius:10,background:'#534AB7',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,color:'#EEEDFE'}},'⚽'),
-            React.createElement('div',null,
-              React.createElement('div',{style:{fontSize:16,fontWeight:500}},'טוטו אנליזר'),
-              React.createElement('div',{style:{fontSize:9,color:'#534AB7',fontWeight:500,letterSpacing:1}},
-                dataMode==='ai'?'🤖 one · sofascore · flashscore':'🔑 API Live'))),
-          React.createElement('div',{style:{display:'flex',gap:6,alignItems:'center'}},
-            React.createElement('button',{onClick:onHistory,style:{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'5px 9px',color:'#888',cursor:'pointer',fontSize:11}},'📚'),
-            React.createElement('button',{onClick:onNewForm,style:{background:'#EEEDFE',border:'0.5px solid #AFA9EC',borderRadius:7,padding:'5px 9px',color:'#534AB7',cursor:'pointer',fontSize:10,fontWeight:500}},'+ טופס'),
-            React.createElement('div',{style:{textAlign:'center'}},
-              React.createElement('div',{style:{fontSize:8,color:'#aaa'}},'מילאתי'),
-              React.createElement('div',{style:{fontSize:17,fontWeight:500,color:picksCount===games.length?'#1D9E75':'#1a1a2e'}},
-                picksCount,React.createElement('span',{style:{fontSize:10,color:'#aaa'}},'/'+games.length))))),
-        React.createElement('div',{style:{display:'flex',gap:0,borderBottom:'0.5px solid #e8e8f0'}},
-          [['form','📋 טופס'],['ai','🤖 ניתוח'],['rows','✨ שורות'],['picks','✏️ שלי']].map(([t,lb])=>
-            React.createElement('button',{key:t,onClick:()=>{setTab(t);setSel(null);},style:{
-              flex:1,padding:'10px 2px',border:'none',
-              borderBottom:tab===t?'2px solid #534AB7':'2px solid transparent',
-              background:'transparent',color:tab===t?'#534AB7':'#aaa',
-              fontWeight:tab===t?500:400,fontSize:11,cursor:'pointer'}},lb)))
-    ),
-    React.createElement('div',{style:{maxWidth:600,margin:'0 auto',padding:'13px 13px 100px'}},
+  return <div style={{background:'#f8f8fc',minHeight:'100vh'}}>
+    <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'14px 14px 0',position:'sticky',top:0,zIndex:100}}>
+      <div style={{maxWidth:600,margin:'0 auto'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:9}}>
+            <div style={{width:34,height:34,borderRadius:10,background:'#534AB7',display:'flex',alignItems:'center',justifyContent:'center',fontSize:17,color:'#EEEDFE'}}>⚽</div>
+            <div>
+              <div style={{fontSize:16,fontWeight:500}}>טוטו אנליזר</div>
+              <div style={{fontSize:9,color:'#534AB7',fontWeight:500}}>🤖 one · sofascore · flashscore</div>
+            </div>
+          </div>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <button onClick={onHistory} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'5px 9px',color:'#888',cursor:'pointer',fontSize:11}}>📚</button>
+            <button onClick={onNewForm} style={{background:'#EEEDFE',border:'0.5px solid #AFA9EC',borderRadius:7,padding:'5px 9px',color:'#534AB7',cursor:'pointer',fontSize:10,fontWeight:500}}>+ טופס</button>
+            <div style={{textAlign:'center'}}>
+              <div style={{fontSize:8,color:'#aaa'}}>מילאתי</div>
+              <div style={{fontSize:17,fontWeight:500,color:cnt===games.length?'#1D9E75':'#1a1a2e'}}>{cnt}<span style={{fontSize:10,color:'#aaa'}}>/{games.length}</span></div>
+            </div>
+          </div>
+        </div>
+        <div style={{display:'flex'}}>
+          {[['form','📋 טופס'],['ai','🤖 ניתוח'],['rows','✨ שורות'],['picks','✏️ שלי']].map(([t,lb])=><button key={t} onClick={()=>{setTab(t);setSel(null)}} style={{flex:1,padding:'10px 2px',border:'none',borderBottom:tab===t?'2px solid #534AB7':'2px solid transparent',background:'transparent',color:tab===t?'#534AB7':'#aaa',fontWeight:tab===t?500:400,fontSize:11,cursor:'pointer'}}>{lb}</button>)}
+        </div>
+      </div>
+    </div>
 
-      // FORM TAB
-      tab==='form'&&React.createElement('div',null,
-        sel&&selP?React.createElement('div',null,
-          React.createElement('button',{onClick:()=>setSel(null),style:{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'7px 13px',color:'#888',cursor:'pointer',marginBottom:12,fontSize:12}},'← חזרה'),
-          React.createElement('div',{style:{background:'#fff',borderRadius:14,padding:18,marginBottom:10,border:'0.5px solid #e8e8f0'}},
-            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}},
-              React.createElement('div',{style:{flex:1,textAlign:'center'}},
-                React.createElement('div',{style:{fontSize:14,fontWeight:500,marginBottom:2}},sel.home),
-                React.createElement('div',{style:{fontSize:9,color:'#aaa',marginBottom:6}},'מקום #'+selP.hPos),
-                React.createElement(FormDots,{form:selP.hForm})),
-              React.createElement('div',{style:{textAlign:'center',padding:'0 10px'}},
-                React.createElement('div',{style:{width:46,height:46,borderRadius:13,margin:'0 auto',
-                  background:VB(selP.pred),border:`0.5px solid ${VC(selP.pred)}`,
-                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,fontWeight:500,color:VC(selP.pred)}},selP.pred),
-                React.createElement('div',{style:{fontSize:9,color:selP.confColor,marginTop:4,fontWeight:500}},'ביטחון '+selP.conf)),
-              React.createElement('div',{style:{flex:1,textAlign:'center'}},
-                React.createElement('div',{style:{fontSize:14,fontWeight:500,marginBottom:2}},sel.away),
-                React.createElement('div',{style:{fontSize:9,color:'#aaa',marginBottom:6}},'מקום #'+selP.aPos),
-                React.createElement(FormDots,{form:selP.aForm}))),
-            React.createElement('div',{style:{display:'flex',gap:12}},
-              React.createElement(ProbBar,{label:'ניצחון בית',value:selP.win,color:'#1D9E75'}),
-              React.createElement(ProbBar,{label:'תיקו',value:selP.draw,color:'#BA7517'}),
-              React.createElement(ProbBar,{label:'ניצחון חוץ',value:selP.loss,color:'#A32D2D'})))
-        ):React.createElement('div',null,
-          React.createElement('div',{style:{display:'flex',gap:5,marginBottom:12,overflowX:'auto',paddingBottom:3}},
-            STRATEGIES.map(s=>React.createElement('button',{key:s.key,onClick:()=>applyFill(s.key),style:{
-              flexShrink:0,display:'flex',alignItems:'center',gap:5,padding:'7px 12px',
-              border:`0.5px solid ${s.bc}66`,borderRadius:20,background:s.bg,color:s.tc,
-              cursor:'pointer',fontSize:11,fontWeight:500,whiteSpace:'nowrap'}},s.icon+' '+s.title))),
-          games.map((g,i)=>{
-            const p=preds[g.id],myPick=userPicks[g.id];
-            return React.createElement('div',{key:g.id,onClick:()=>setSel(g),
-              style:{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,
-                border:`0.5px solid ${myPick?'#AFA9EC':'#e8e8f0'}`,cursor:'pointer'}},
-              React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:6}},
-                React.createElement('span',{style:{fontSize:9,color:'#aaa'}},'#'+(i+1)),
-                React.createElement('span',{style:{fontSize:9,color:'#aaa'}},g.league)),
-              React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center'}},
-                React.createElement('div',{style:{flex:1}},
-                  React.createElement('div',{style:{fontSize:12,fontWeight:500,marginBottom:3}},g.home),
-                  p&&React.createElement(FormDots,{form:p.hForm})),
-                p&&React.createElement('div',{style:{display:'flex',gap:8,padding:'0 8px'}},
-                  [{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=>
-                    React.createElement('div',{key:l,style:{textAlign:'center'}},
-                      React.createElement('div',{style:{fontSize:11,fontWeight:p.pred===l?500:400,color:VC(l),opacity:p.pred===l?1:0.35}},v+'%'),
-                      React.createElement('div',{style:{fontSize:8,color:'#aaa'}},l)))),
-                React.createElement('div',{style:{flex:1,textAlign:'right'}},
-                  React.createElement('div',{style:{fontSize:12,fontWeight:500,marginBottom:3}},g.away),
-                  p&&React.createElement('div',{style:{display:'flex',justifyContent:'flex-end'}},React.createElement(FormDots,{form:p.aForm})))),
-              myPick&&React.createElement('div',{style:{marginTop:7,textAlign:'center'}},
-                React.createElement('span',{style:{fontSize:10,fontWeight:500,padding:'2px 9px',borderRadius:20,
-                  background:VB(myPick),color:VC(myPick),border:`0.5px solid ${VC(myPick)}44`}},
-                  myPick+' '+(p?.pred===myPick?'✓ תואם AI':'⚡ שונה מ-AI'))));}))
-      ),
+    <div style={{maxWidth:600,margin:'0 auto',padding:'13px 13px 100px'}}>
 
-      // AI TAB
-      tab==='ai'&&games.map(g=>{
-        const p=preds[g.id];if(!p)return null;
-        return React.createElement('div',{key:g.id,onClick:()=>{setSel(g);setTab('form');},
-          style:{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}},
-          React.createElement('div',{style:{display:'flex',alignItems:'center',gap:10}},
-            React.createElement('div',{style:{flex:1}},
-              React.createElement('div',{style:{fontSize:11,fontWeight:500,marginBottom:4}},g.home+' – '+g.away),
-              React.createElement('div',{style:{display:'flex',gap:9}},
-                [{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=>
-                  React.createElement('div',{key:l},
-                    React.createElement('div',{style:{height:3,width:38,background:'#f0f0f0',borderRadius:2}},
-                      React.createElement('div',{style:{width:v+'%',height:'100%',background:VC(l),borderRadius:2}})),
-                    React.createElement('div',{style:{fontSize:9,color:VC(l),opacity:p.pred===l?1:0.35,marginTop:2}},l+' '+v+'%'))))),
-            React.createElement('div',{style:{textAlign:'center'}},
-              React.createElement(CellBadge,{v:p.pred,size:34}),
-              React.createElement('div',{style:{fontSize:8,color:p.confColor,fontWeight:500,marginTop:3}},p.conf))));}),
+      {tab==='form'&&<div>
+        {sel&&selP?<div>
+          <button onClick={()=>setSel(null)} style={{background:'#f5f5f5',border:'0.5px solid #e0e0e0',borderRadius:7,padding:'7px 13px',color:'#888',cursor:'pointer',marginBottom:12,fontSize:12}}>← חזרה</button>
+          <div style={{background:'#fff',borderRadius:14,padding:18,marginBottom:10,border:'0.5px solid #e8e8f0'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div style={{flex:1,textAlign:'center'}}>
+                <div style={{fontSize:14,fontWeight:500,marginBottom:2}}>{sel.home}</div>
+                <div style={{fontSize:9,color:'#aaa',marginBottom:6}}>מקום #{selP.hPos}</div>
+                <Dots form={selP.hForm}/>
+              </div>
+              <div style={{textAlign:'center',padding:'0 10px'}}>
+                <div style={{width:46,height:46,borderRadius:13,margin:'0 auto',background:VB(selP.pred),border:`0.5px solid ${VC(selP.pred)}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:21,fontWeight:500,color:VC(selP.pred)}}>{selP.pred}</div>
+                <div style={{fontSize:9,color:selP.confColor,marginTop:4,fontWeight:500}}>ביטחון {selP.conf}</div>
+              </div>
+              <div style={{flex:1,textAlign:'center'}}>
+                <div style={{fontSize:14,fontWeight:500,marginBottom:2}}>{sel.away}</div>
+                <div style={{fontSize:9,color:'#aaa',marginBottom:6}}>מקום #{selP.aPos}</div>
+                <Dots form={selP.aForm}/>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:12}}>
+              {[{l:'ניצחון בית',v:selP.win,c:'#1D9E75'},{l:'תיקו',v:selP.draw,c:'#BA7517'},{l:'ניצחון חוץ',v:selP.loss,c:'#A32D2D'}].map(({l,v,c})=><div key={l} style={{flex:1,textAlign:'center'}}>
+                <div style={{fontSize:18,fontWeight:500,color:c}}>{v}%</div>
+                <div style={{height:4,borderRadius:2,background:'#e0e0e0',overflow:'hidden',margin:'4px 0'}}><div style={{width:v+'%',height:'100%',background:c}}/></div>
+                <div style={{fontSize:10,color:'#888'}}>{l}</div>
+              </div>)}
+            </div>
+          </div>
+        </div>:<div>
+          <div style={{display:'flex',gap:5,marginBottom:12,overflowX:'auto',paddingBottom:3}}>
+            {STRATS.map(s=><button key={s.key} onClick={()=>applyFill(s.key)} style={{flexShrink:0,padding:'7px 12px',border:`0.5px solid ${s.bc}66`,borderRadius:20,background:s.bg,color:s.tc,cursor:'pointer',fontSize:11,fontWeight:500}}>{s.icon} {s.title}</button>)}
+          </div>
+          {games.map((g,i)=>{const p=preds[g.id],myP=picks[g.id];
+            return <div key={g.id} onClick={()=>setSel(g)} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:`0.5px solid ${myP?'#AFA9EC':'#e8e8f0'}`,cursor:'pointer'}}>
+              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+                <span style={{fontSize:9,color:'#aaa'}}>#{i+1}</span>
+                <span style={{fontSize:9,color:'#aaa'}}>{g.league}</span>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{g.home}</div>
+                  {p&&<Dots form={p.hForm}/>}
+                </div>
+                {p&&<div style={{display:'flex',gap:8,padding:'0 8px'}}>
+                  {[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=><div key={l} style={{textAlign:'center'}}>
+                    <div style={{fontSize:11,fontWeight:p.pred===l?500:400,color:VC(l),opacity:p.pred===l?1:0.35}}>{v}%</div>
+                    <div style={{fontSize:8,color:'#aaa'}}>{l}</div>
+                  </div>)}
+                </div>}
+                <div style={{flex:1,textAlign:'right'}}>
+                  <div style={{fontSize:12,fontWeight:500,marginBottom:3}}>{g.away}</div>
+                  {p&&<div style={{display:'flex',justifyContent:'flex-end'}}><Dots form={p.aForm}/></div>}
+                </div>
+              </div>
+              {myP&&<div style={{marginTop:7,textAlign:'center'}}>
+                <span style={{fontSize:10,fontWeight:500,padding:'2px 9px',borderRadius:20,background:VB(myP),color:VC(myP),border:`0.5px solid ${VC(myP)}44`}}>{myP} {p?.pred===myP?'✓ תואם AI':'⚡ שונה מ-AI'}</span>
+              </div>}
+            </div>;})}
+        </div>}
+      </div>}
 
-      // ROWS TAB
-      tab==='rows'&&React.createElement('div',null,
-        STRATEGIES.map(s=>{
-          const row=s.key==='safe'?safeRow:s.key==='surprise'?surpriseRow:boldRow;
+      {tab==='ai'&&games.map(g=>{const p=preds[g.id];if(!p)return null;
+        return <div key={g.id} onClick={()=>{setSel(g);setTab('form')}} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:'0.5px solid #e8e8f0',cursor:'pointer'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:11,fontWeight:500,marginBottom:4}}>{g.home} – {g.away}</div>
+              <div style={{display:'flex',gap:9}}>
+                {[{v:p.win,l:'1'},{v:p.draw,l:'X'},{v:p.loss,l:'2'}].map(({v,l})=><div key={l}>
+                  <div style={{height:3,width:38,background:'#f0f0f0',borderRadius:2}}><div style={{width:v+'%',height:'100%',background:VC(l),borderRadius:2}}/></div>
+                  <div style={{fontSize:9,color:VC(l),opacity:p.pred===l?1:0.35,marginTop:2}}>{l} {v}%</div>
+                </div>)}
+              </div>
+            </div>
+            <div style={{textAlign:'center'}}><Cell v={p.pred} size={34}/><div style={{fontSize:8,color:p.confColor,fontWeight:500,marginTop:3}}>{p.conf}</div></div>
+          </div>
+        </div>;})}
+
+      {tab==='rows'&&<div>
+        {STRATS.map(s=>{
+          const row=buildRow(s.key,preds,games);
           const diff=s.key!=='safe'?row.filter((v,i)=>v!==safeRow[i]).length:0;
-          return React.createElement('div',{key:s.key,style:{background:'#fff',borderRadius:14,padding:16,marginBottom:12,border:`0.5px solid ${s.bc}44`}},
-            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}},
-              React.createElement('div',{style:{display:'flex',alignItems:'center',gap:9}},
-                React.createElement('div',{style:{width:34,height:34,borderRadius:9,background:s.bg,
-                  border:`0.5px solid ${s.bc}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}},s.icon),
-                React.createElement('div',null,
-                  React.createElement('div',{style:{fontSize:13,fontWeight:500}},s.title),
-                  React.createElement('span',{style:{fontSize:9,color:s.tc,background:s.bg,padding:'2px 7px',
-                    borderRadius:20,border:`0.5px solid ${s.bc}44`,fontWeight:500}},s.badge))),
-              React.createElement('button',{onClick:()=>applyFill(s.key),style:{padding:'7px 14px',borderRadius:20,
-                border:'none',cursor:'pointer',background:s.bc,color:'#fff',fontWeight:500,fontSize:11}},'החל ✓')),
-            React.createElement('div',{style:{fontSize:11,color:'#888',marginBottom:10,lineHeight:1.6}},s.desc),
-            React.createElement('div',{style:{background:'#fafafa',borderRadius:9,padding:'9px 11px'}},
-              React.createElement('div',{style:{fontSize:9,color:'#aaa',marginBottom:6,fontWeight:500}},'תצוגה מקדימה:'),
-              React.createElement('div',{style:{display:'flex',flexWrap:'wrap',gap:4}},
-                row.map((v,i)=>React.createElement('div',{key:i,style:{textAlign:'center'}},
-                  React.createElement('div',{style:{fontSize:7,color:'#ccc',marginBottom:2}},i+1),
-                  React.createElement(CellBadge,{v}))))),
-            s.key!=='safe'&&React.createElement('div',{style:{marginTop:7,fontSize:10,color:'#aaa',textAlign:'center'}},diff+' שינויים מהשורה הבטוחה'));})),
+          return <div key={s.key} style={{background:'#fff',borderRadius:14,padding:16,marginBottom:12,border:`0.5px solid ${s.bc}44`}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:9}}>
+                <div style={{width:34,height:34,borderRadius:9,background:s.bg,border:`0.5px solid ${s.bc}44`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:18}}>{s.icon}</div>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500}}>{s.title}</div>
+                  <span style={{fontSize:9,color:s.tc,background:s.bg,padding:'2px 7px',borderRadius:20,border:`0.5px solid ${s.bc}44`,fontWeight:500}}>{s.badge}</span>
+                </div>
+              </div>
+              <button onClick={()=>applyFill(s.key)} style={{padding:'7px 14px',borderRadius:20,border:'none',cursor:'pointer',background:s.bc,color:'#fff',fontWeight:500,fontSize:11}}>החל ✓</button>
+            </div>
+            <div style={{background:'#fafafa',borderRadius:9,padding:'9px 11px'}}>
+              <div style={{fontSize:9,color:'#aaa',marginBottom:6,fontWeight:500}}>תצוגה מקדימה:</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                {row.map((v,i)=><div key={i} style={{textAlign:'center'}}><div style={{fontSize:7,color:'#ccc',marginBottom:2}}>{i+1}</div><Cell v={v}/></div>)}
+              </div>
+            </div>
+            {s.key!=='safe'&&<div style={{marginTop:7,fontSize:10,color:'#aaa',textAlign:'center'}}>{diff} שינויים מהשורה הבטוחה</div>}
+          </div>;})}
+      </div>}
 
-      // PICKS TAB
-      tab==='picks'&&React.createElement('div',null,
-        autoMode&&React.createElement('div',{style:{background:STRATEGIES.find(s=>s.key===autoMode)?.bg,borderRadius:10,
-          padding:'9px 14px',marginBottom:12,border:`0.5px solid ${STRATEGIES.find(s=>s.key===autoMode)?.bc}44`,
-          display:'flex',alignItems:'center',justifyContent:'space-between'}},
-          React.createElement('div',{style:{fontSize:11,color:STRATEGIES.find(s=>s.key===autoMode)?.tc,fontWeight:500}},
-            STRATEGIES.find(s=>s.key===autoMode)?.icon+' '+STRATEGIES.find(s=>s.key===autoMode)?.title),
-          React.createElement('button',{onClick:()=>{setPicks({});setAuto(null);},style:{background:'transparent',
-            border:`0.5px solid ${STRATEGIES.find(s=>s.key===autoMode)?.bc}44`,borderRadius:6,
-            padding:'3px 9px',color:STRATEGIES.find(s=>s.key===autoMode)?.tc,cursor:'pointer',fontSize:10}},'נקה')),
-        games.map((g,i)=>{
-          const p=preds[g.id],myPick=userPicks[g.id];
-          return React.createElement('div',{key:g.id,style:{background:'#fff',borderRadius:12,padding:'12px 14px',
-            marginBottom:8,border:`0.5px solid ${myPick?'#AFA9EC':'#e8e8f0'}`}},
-            React.createElement('div',{style:{display:'flex',justifyContent:'space-between',marginBottom:7}},
-              React.createElement('span',{style:{fontSize:9,color:'#aaa'}},'#'+(i+1)+' · '+g.league),
-              p&&React.createElement('span',{style:{fontSize:9,color:p.confColor,fontWeight:500}},'ביטחון '+p.conf)),
-            React.createElement('div',{style:{fontSize:12,fontWeight:500,textAlign:'center',marginBottom:9}},
-              g.home+' — '+g.away),
-            React.createElement('div',{style:{display:'flex',gap:7}},
-              [['1','בית'],['X','תיקו'],['2','חוץ']].map(([v,lb])=>{
-                const isAI=p?.pred===v,isPicked=myPick===v;
-                return React.createElement('button',{key:v,onClick:()=>setPick(g.id,v),style:{
-                  flex:1,padding:'10px 4px',border:`0.5px solid ${isPicked?VC(v):'#e0e0e0'}`,
-                  borderRadius:10,cursor:'pointer',background:isPicked?VB(v):'#fafafa',
-                  color:isPicked?VC(v):'#aaa',fontWeight:isPicked?500:400,fontSize:16,position:'relative'}},
-                  isAI&&React.createElement('div',{style:{position:'absolute',top:-7,right:-4,background:'#534AB7',
-                    borderRadius:4,padding:'1px 4px',fontSize:7,color:'#EEEDFE',fontWeight:500}},'AI'),
-                  v,React.createElement('div',{style:{fontSize:8,opacity:0.6,marginTop:2}},lb),
-                  p&&React.createElement('div',{style:{fontSize:8,opacity:0.5}},v==='1'?p.win:v==='X'?p.draw:p.loss+'%'));})
-            ));})
-      ),
+      {tab==='picks'&&<div>
+        {autoMode&&<div style={{background:STRATS.find(s=>s.key===autoMode)?.bg,borderRadius:10,padding:'9px 14px',marginBottom:12,border:`0.5px solid ${STRATS.find(s=>s.key===autoMode)?.bc}44`,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{fontSize:11,color:STRATS.find(s=>s.key===autoMode)?.tc,fontWeight:500}}>{STRATS.find(s=>s.key===autoMode)?.icon} {STRATS.find(s=>s.key===autoMode)?.title}</div>
+          <button onClick={()=>{setPicks({});setAuto(null)}} style={{background:'transparent',border:`0.5px solid ${STRATS.find(s=>s.key===autoMode)?.bc}44`,borderRadius:6,padding:'3px 9px',color:STRATS.find(s=>s.key===autoMode)?.tc,cursor:'pointer',fontSize:10}}>נקה</button>
+        </div>}
+        {games.map((g,i)=>{const p=preds[g.id],myP=picks[g.id];
+          return <div key={g.id} style={{background:'#fff',borderRadius:12,padding:'12px 14px',marginBottom:8,border:`0.5px solid ${myP?'#AFA9EC':'#e8e8f0'}`}}>
+            <div style={{display:'flex',justifyContent:'space-between',marginBottom:7}}>
+              <span style={{fontSize:9,color:'#aaa'}}>#{i+1} · {g.league}</span>
+              {p&&<span style={{fontSize:9,color:p.confColor,fontWeight:500}}>ביטחון {p.conf}</span>}
+            </div>
+            <div style={{fontSize:12,fontWeight:500,textAlign:'center',marginBottom:9}}>{g.home} — {g.away}</div>
+            <div style={{display:'flex',gap:7}}>
+              {[['1','בית'],['X','תיקו'],['2','חוץ']].map(([v,lb])=>{const isAI=p?.pred===v,isPicked=myP===v;
+                return <button key={v} onClick={()=>setPick(g.id,v)} style={{flex:1,padding:'10px 4px',border:`0.5px solid ${isPicked?VC(v):'#e0e0e0'}`,borderRadius:10,cursor:'pointer',background:isPicked?VB(v):'#fafafa',color:isPicked?VC(v):'#aaa',fontWeight:isPicked?500:400,fontSize:16,position:'relative'}}>
+                  {isAI&&<div style={{position:'absolute',top:-7,right:-4,background:'#534AB7',borderRadius:4,padding:'1px 4px',fontSize:7,color:'#EEEDFE',fontWeight:500}}>AI</div>}
+                  {v}<div style={{fontSize:8,opacity:0.6,marginTop:2}}>{lb}</div>
+                  {p&&<div style={{fontSize:8,opacity:0.5}}>{v==='1'?p.win:v==='X'?p.draw:p.loss}%</div>}
+                </button>;})}
+            </div>
+          </div>;})}
+      </div>}
 
-      // AppNest Badge
-      React.createElement(AppNestBadge)
-    ),
+      <AppNestBadge/>
+    </div>
 
-    // BOTTOM BAR
-    tab!=='rows'&&React.createElement('div',{style:{position:'fixed',bottom:0,left:0,right:0,
-      background:'linear-gradient(0deg,#f8f8fc 55%,transparent)',padding:'12px 13px 18px'}},
-      React.createElement('div',{style:{maxWidth:600,margin:'0 auto'}},
-        React.createElement('div',{style:{background:'#fff',borderRadius:10,padding:'8px 12px',
-          border:'0.5px solid #e8e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}},
-          React.createElement('div',{style:{fontSize:9,color:'#aaa'}},'🛡️ שורה בטוחה:'),
-          React.createElement('div',{style:{display:'flex',gap:2}},
-            safeRow.map((v,i)=>React.createElement(CellBadge,{key:i,v,size:19}))))))
-  );
+    {tab!=='rows'&&<div style={{position:'fixed',bottom:0,left:0,right:0,background:'linear-gradient(0deg,#f8f8fc 55%,transparent)',padding:'12px 13px 18px'}}>
+      <div style={{maxWidth:600,margin:'0 auto'}}>
+        <div style={{background:'#fff',borderRadius:10,padding:'8px 12px',border:'0.5px solid #e8e8f0',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div style={{fontSize:9,color:'#aaa'}}>🛡️ שורה בטוחה:</div>
+          <div style={{display:'flex',gap:2}}>{safeRow.map((v,i)=><Cell key={i} v={v} size={19}/>)}</div>
+        </div>
+      </div>
+    </div>}
+  </div>;
 }
 
-// ============================================================
-// ROOT
-// ============================================================
+// ── Root ──────────────────────────────────────────────────────
 function App(){
   const [screen,setScreen]=useState('setup');
-  const [dataMode,setDM]=useState('ai');
+  const [mode,setMode]=useState('ai');
   const [games,setGames]=useState([]);
   const [preds,setPreds]=useState({});
   const [history,setHistory]=useState([]);
-  const [savedMode,setSaved]=useState(null);
+  const [saved,setSaved]=useState(null);
 
   useEffect(()=>{
     setHistory(loadHistory());
     const m=loadMode();if(m)setSaved(m);
   },[]);
 
-  const handleSetup=(mode)=>{setDM(mode);saveMode(mode);setScreen('enter');};
-  const handleGamesEntered=async(enteredGames)=>{
-    setGames(enteredGames);setScreen('loading');
-    const newPreds={};
-    for(const g of enteredGames){
+  const handleSetup=m=>{setMode(m);saveMode(m);setScreen('enter');};
+  const handleGames=async entered=>{
+    setGames(entered);setScreen('loading');
+    const np={};
+    for(const g of entered){
       try{
-        let hs=null,as_=null;
-        if(dataMode==='ai'){[hs,as_]=await Promise.all([fetchTeamStats(g.home,g.league),fetchTeamStats(g.away,g.league)]);}
-        newPreds[g.id]=predictFromData(hs||{},as_||{});
-      }catch{newPreds[g.id]=predictFromData({},{});}
+        let hs=null,as=null;
+        if(mode==='ai')[hs,as]=await Promise.all([fetchStats(g.home,g.league),fetchStats(g.away,g.league)]);
+        np[g.id]=predict(hs,as);
+      }catch{np[g.id]=predict(null,null);}
     }
-    setPreds(newPreds);
-    const safeRow=buildRow('safe',newPreds,enteredGames);
-    const newEntry={date:new Date().toISOString(),games:enteredGames,preds:newPreds,safeRow};
-    const updated=[newEntry,...history].slice(0,20);
+    setPreds(np);
+    const sr=buildRow('safe',np,entered);
+    const entry={date:new Date().toISOString(),games:entered,preds:np,safeRow:sr};
+    const updated=[entry,...history].slice(0,20);
     setHistory(updated);saveHistory(updated);
     setScreen('main');
   };
 
-  return React.createElement('div',null,
-    screen==='setup'&&React.createElement(SetupScreen,{savedMode,onDone:handleSetup}),
-    screen==='enter'&&React.createElement(EnterGamesScreen,{onDone:handleGamesEntered,onHistory:()=>setScreen('history')}),
-    screen==='loading'&&React.createElement(LoadingScreen,{games}),
-    screen==='main'&&React.createElement(MainApp,{games,preds,dataMode,
-      onNewForm:()=>setScreen('enter'),onHistory:()=>setScreen('history'),onCompare:()=>setScreen('history')}),
-    screen==='history'&&React.createElement(HistoryScreen,{history,
-      onBack:()=>setScreen(games.length?'main':'enter'),
-      onLoad:entry=>{setGames(entry.games);setPreds(entry.preds||{});setScreen('main');}})
-  );
+  return <>
+    {screen==='setup'&&<Setup saved={saved} onDone={handleSetup}/>}
+    {screen==='enter'&&<EnterGames onDone={handleGames} onHistory={()=>setScreen('history')}/>}
+    {screen==='loading'&&<Loading games={games}/>}
+    {screen==='main'&&<MainApp games={games} preds={preds} dataMode={mode} onNewForm={()=>setScreen('enter')} onHistory={()=>setScreen('history')}/>}
+    {screen==='history'&&<History history={history} onBack={()=>setScreen(games.length?'main':'enter')} onLoad={e=>{setGames(e.games);setPreds(e.preds||{});setScreen('main');}}/>}
+  </>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
