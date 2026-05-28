@@ -159,18 +159,66 @@ function EnterGames({onDone,onHistory}){
   const upd=(id,f,v)=>setGames(p=>p.map(g=>g.id===id?{...g,[f]:v}:g));
   const LEAGUES=['ליגת העל','פרמייר ליג','לה ליגה','בונדסליגה','סריה א','ליג 1','ארדיביזי','ליגת האלופות','אחר'];
 
-  const handleAuto=async()=>{
-    setAutoLoad(true);setAutoErr('');setAutoMsg('מחפש ב-toto.co.il...');
-    try{
-      const found=await fetchWeeklyGames();
-      if(found?.length>=10){
-        setAutoMsg(`✓ נמצאו ${found.length} משחקים!`);
-        setGames(found.length===16?found:[...found,...Array.from({length:16-found.length},(_,i)=>({id:found.length+i+1,home:'',away:'',league:''}))]);
-        setTimeout(()=>setAutoMsg(''),3000);
-      }else{setAutoErr('לא נמצא — הכנס ידנית');setAutoMsg('');}
-    }catch{setAutoErr('שגיאה — הכנס ידנית');setAutoMsg('');}
-    setAutoLoad(false);
+  // פרסור טקסט מ-toto.co.il
+  const [pasteText,setPasteText]=useState('');
+  const [showPaste,setShowPaste]=useState(false);
+
+  function parseGamesFromText(text){
+    const lines=text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+    const found=[];
+    // חפש דפוסי "קבוצה נגד קבוצה" או "קבוצה - קבוצה" או "קבוצה vs קבוצה"
+    const patterns=[
+      /^(.+?)\s+(?:נגד|vs\.?|-|–)\s+(.+?)(?:\s+[\(\[].*[\)\]])?$/i,
+      /^\d+[\.)]\.?\s*(.+?)\s+(?:נגד|vs\.?|-|–)\s+(.+)$/i,
+    ];
+    for(const line of lines){
+      for(const pat of patterns){
+        const m=line.match(pat);
+        if(m){
+          const home=m[1].replace(/^\d+[\.)]\.?\s*/,'').trim();
+          const away=m[2].replace(/[\(\[].*[\)\]].*$/,'').trim();
+          if(home.length>1&&away.length>1&&found.length<16){
+            // נסה לזהות ליגה
+            const lstr=line.toLowerCase();
+            const league=lstr.includes('פרמייר')||lstr.includes('אנגל')?'פרמייר ליג':
+              lstr.includes('ספרד')||lstr.includes('לה ליגה')?'לה ליגה':
+              lstr.includes('גרמנ')||lstr.includes('בונד')?'בונדסליגה':
+              lstr.includes('איטל')||lstr.includes('סריה')?'סריה א':
+              lstr.includes('צרפת')||lstr.includes('ליג 1')?'ליג 1':
+              lstr.includes('ליגת העל')||lstr.includes('ישראל')?'ליגת העל':'';
+            found.push({id:found.length+1,home,away,league});
+            break;
+          }
+        }
+      }
+    }
+    // נסיון שני — חפש שורות עם "בית" ו"חוץ"
+    if(found.length<8){
+      const homeAwayPat=/([\u0590-\u05FF\w\s]+?)\s{2,}([\u0590-\u05FF\w\s]+)/g;
+      let m2;
+      while((m2=homeAwayPat.exec(text))&&found.length<16){
+        const h=m2[1].trim(),a=m2[2].trim();
+        if(h.length>2&&a.length>2&&!h.match(/^\d+$/)&&!a.match(/^\d+$/))
+          found.push({id:found.length+1,home:h,away:a,league:''});
+      }
+    }
+    return found;
+  }
+
+  const handlePasteParse=()=>{
+    if(!pasteText.trim()){setAutoErr('הדבק תחילה את הטקסט');return;}
+    const found=parseGamesFromText(pasteText);
+    if(found.length>=8){
+      setAutoMsg(`✓ זוהו ${found.length} משחקים!`);
+      const filled2=found.length===16?found:[...found,...Array.from({length:16-found.length},(_,i)=>({id:found.length+i+1,home:'',away:'',league:''}))];
+      setGames(filled2);setShowPaste(false);setPasteText('');
+      setTimeout(()=>setAutoMsg(''),3000);
+    }else{
+      setAutoErr(`זוהו רק ${found.length} משחקים — נסה להעתיק יותר טקסט מהדף`);
+    }
   };
+
+  const handleAuto=()=>{setShowPaste(true);setAutoErr('');};
 
   return <div style={{minHeight:'100vh',background:'#f8f8fc'}}>
     <div style={{background:'#fff',borderBottom:'0.5px solid #e8e8f0',padding:'16px 16px 12px',position:'sticky',top:0,zIndex:100}}>
@@ -197,9 +245,35 @@ function EnterGames({onDone,onHistory}){
             <div style={{fontSize:11,color:'#888'}}>Claude יחפש את 16 המשחקים</div>
           </div>
         </div>
-        <button onClick={handleAuto} disabled={autoLoad} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:autoLoad?'#e0e0e0':'#534AB7',color:autoLoad?'#aaa':'#fff',fontWeight:500,cursor:autoLoad?'default':'pointer',fontSize:13}}>
-          {autoLoad?'⏳ מחפש...':'✨ טען טופס שבועי אוטומטית'}
-        </button>
+        {!showPaste?<>
+          <button onClick={handleAuto} style={{width:'100%',padding:12,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>
+            ✨ טען טופס שבועי — הדבק טקסט
+          </button>
+          <div style={{marginTop:8,fontSize:11,color:'#888',lineHeight:1.7,textAlign:'center'}}>
+            כנס ל-<a href="https://www.toto.co.il" target="_blank" style={{color:'#534AB7'}}>toto.co.il</a> ← העתק את כל הטקסט של הדף ← הדבק כאן
+          </div>
+        </>:<div>
+          <div style={{fontSize:11,color:'#534AB7',fontWeight:500,marginBottom:8}}>
+            📋 הדבק את הטקסט מ-toto.co.il:
+          </div>
+          <div style={{fontSize:11,color:'#888',marginBottom:8,lineHeight:1.7,background:'#f5f5f5',borderRadius:8,padding:'8px 10px'}}>
+            1. כנס ל-<a href="https://www.toto.co.il" target="_blank" style={{color:'#534AB7'}}>toto.co.il</a><br/>
+            2. בחר הכל (Ctrl+A) ← העתק (Ctrl+C)<br/>
+            3. הדבק כאן ולחץ "נתח"
+          </div>
+          <textarea value={pasteText} onChange={e=>setPasteText(e.target.value)}
+            placeholder="הדבק כאן את הטקסט מהאתר..."
+            style={{width:'100%',minHeight:120,padding:'10px 12px',borderRadius:10,border:'0.5px solid #AFA9EC',
+              background:'#fafafa',fontSize:12,resize:'vertical',outline:'none',marginBottom:8,direction:'rtl'}}/>
+          <div style={{display:'flex',gap:8}}>
+            <button onClick={handlePasteParse} style={{flex:1,padding:11,borderRadius:10,border:'none',background:'#534AB7',color:'#fff',fontWeight:500,cursor:'pointer',fontSize:13}}>
+              🔍 נתח טקסט
+            </button>
+            <button onClick={()=>{setShowPaste(false);setPasteText('');setAutoErr('')}} style={{padding:'11px 14px',borderRadius:10,border:'0.5px solid #e0e0e0',background:'#fff',color:'#888',cursor:'pointer',fontSize:12}}>
+              ביטול
+            </button>
+          </div>
+        </div>}
         {autoMsg&&<div style={{marginTop:8,padding:'8px 12px',background:'#E1F5EE',borderRadius:8,fontSize:11,color:'#085041',textAlign:'center'}}>{autoMsg}</div>}
         {autoErr&&<div style={{marginTop:8,padding:'8px 12px',background:'#FCEBEB',borderRadius:8,fontSize:11,color:'#501313',textAlign:'center'}}>{autoErr}</div>}
       </div>
