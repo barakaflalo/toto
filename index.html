@@ -117,7 +117,7 @@ body{font-family:var(--font);color:var(--text);font-size:14px;line-height:1.5}
 .scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
 
 /* BOTTOM WHITE BAR */
-.bottom-white{background:#fff;padding:12px 16px max(20px,env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid #e8e8e8}
+.bottom-white{background:#fff;padding:12px 16px max(34px,env(safe-area-inset-bottom,34px));flex-shrink:0;border-top:1px solid #e8e8e8}
 .bottom-white .btn-hint{font-size:11px;color:#aaa;text-align:center;margin-bottom:8px}
 .bottom-white .btn-hint.ready{color:var(--accent2)}
 
@@ -250,7 +250,7 @@ textarea{resize:none}
     <div id="guide-content" style="width:100%;max-width:360px;text-align:center"></div>
     <div style="display:flex;gap:6px;margin-top:24px" id="guide-dots"></div>
   </div>
-  <div class="bottom-white">
+  <div style="background:#fff;padding:12px 16px;padding-bottom:max(40px,env(safe-area-inset-bottom,40px));flex-shrink:0;border-top:1px solid #e8e8e8">
     <div style="display:flex;gap:8px">
       <button class="btn-outline" style="flex:1" onclick="skipGuide()" id="guide-skip-btn">דלג</button>
       <button class="btn-primary green" style="flex:2" onclick="nextGuide()" id="guide-next-btn">הבא</button>
