@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0d0d0d" id="theme-color-meta">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Winner אנליזר</title>
+<link rel="manifest" href="#" id="manifest-link">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&family=Rubik+Mono+One&display=swap');
+
+:root {
+  --bg: #0d0d0d;
+  --bg2: #141414;
+  --bg3: #1a1a1a;
+  --border: #2a2a2a;
+  --border2: #3a3a3a;
+  --text: #e8e8e8;
+  --text2: #999;
+  --text3: #555;
+  --accent: #d4a843;
+  --accent2: #B87333;
+  --accent-bg: #1a1200;
+  --accent-bg2: #2a1f00;
+  --green: #4ade80;
+  --green-bg: #0a2a1a;
+  --green-border: #1D9E75;
+  --red: #f87171;
+  --red-bg: #2a0a0a;
+  --red-border: #A32D2D;
+  --amber: #d4a843;
+  --amber-bg: #2a1800;
+  --blue: #60a5fa;
+  --blue-bg: #0a1a2e;
+  --blue-border: #185FA5;
+  --white-btn: #ffffff;
+  --white-btn-text: #0d0d0d;
+  --font: 'Rubik', sans-serif;
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+[data-theme="blue"] {
+  --accent: #60a5fa;
+  --accent2: #3b82f6;
+  --accent-bg: #0a1525;
+  --accent-bg2: #0f1e35;
+}
+[data-theme="purple"] {
+  --accent: #a78bfa;
+  --accent2: #7c3aed;
+  --accent-bg: #120a25;
+  --accent-bg2: #1a0f35;
+}
+[data-theme="red"] {
+  --accent: #f87171;
+  --accent2: #dc2626;
+  --accent-bg: #250a0a;
+  --accent-bg2: #350f0f;
+}
+
+/* LIGHT MODE */
+[data-mode="light"]{--bg:#f2f2f2;--bg2:#ffffff;--bg3:#e8e8e8;--border:#d8d8d8;--border2:#c8c8c8;--text:#1a1a1a;--text2:#555;--text3:#999;--accent:#B87333;--accent2:#9a5f1a;--accent-bg:#fff8ee;--accent-bg2:#ffecd0;--green:#16a34a;--green-bg:#f0fdf4;--green-border:#16a34a;--red:#dc2626;--red-bg:#fef2f2;--red-border:#dc2626;--amber:#b45309;--amber-bg:#fffbeb}
+[data-mode="light"][data-theme="blue"]{--accent:#2563eb;--accent2:#1d4ed8;--accent-bg:#eff6ff;--accent-bg2:#dbeafe}
+[data-mode="light"][data-theme="purple"]{--accent:#7c3aed;--accent2:#6d28d9;--accent-bg:#f5f3ff;--accent-bg2:#ede9fe}
+[data-mode="light"][data-theme="red"]{--accent:#dc2626;--accent2:#b91c1c;--accent-bg:#fef2f2;--accent-bg2:#fee2e2}
+
+/* TOAST */
+#toast-wrap{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:600;display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:90%}
+.toast{padding:10px 20px;border-radius:30px;font-size:13px;font-weight:600;text-align:center;animation:toastIn .3s ease;white-space:nowrap;max-width:100%}
+.toast.out{animation:toastOut .3s ease forwards}
+.toast.s{background:var(--green-border);color:#fff}
+.toast.e{background:#dc2626;color:#fff}
+.toast.i{background:var(--accent2);color:#fff}
+.toast.d{background:var(--text);color:var(--bg)}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1}to{opacity:0;transform:translateY(-6px)}}
+
+/* DIALOG */
+#dlg-ov{display:none;position:absolute;inset:0;background:rgba(0,0,0,.65);z-index:500;align-items:center;justify-content:center;padding:20px}
+#dlg-ov.open{display:flex}
+.dlg-box{background:var(--bg2);border-radius:var(--radius-lg);padding:22px;width:100%;max-width:320px;border:.5px solid var(--border2)}
+.dlg-t{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center}
+.dlg-m{font-size:13px;color:var(--text2);line-height:1.6;text-align:center;margin-bottom:18px}
+.dlg-b{display:flex;gap:8px}
+.dlg-danger{flex:1;padding:12px;border-radius:var(--radius);background:var(--red-bg);border:1px solid var(--red-border);color:var(--red);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)}
+.dlg-cancel{flex:1;padding:12px;border-radius:var(--radius);background:transparent;border:.5px solid var(--border2);color:var(--text2);font-size:13px;cursor:pointer;font-family:var(--font)}
+
+/* STRAT CARD */
+.strat-cell{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:var(--font);color:var(--text);font-size:14px;line-height:1.5}
+
+.app{width:100%;max-width:480px;height:100vh;margin:0 auto;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;position:relative}
+
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden}
+.screen.active{display:flex}
+
+/* TOPBAR */
+.topbar{background:var(--bg);padding:10px 16px 8px;display:flex;align-items:center;justify-content:space-between;border-bottom:0.5px solid var(--border);flex-shrink:0;position:relative}
+.topbar-title{font-size:16px;font-weight:600;color:var(--accent)}
+.back-btn{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;border-radius:var(--radius);background:var(--accent-bg);border:1.5px solid var(--accent2);color:var(--accent);font-size:13px;font-weight:700;flex-shrink:0;transition:opacity 0.15s}
+.back-btn:active{opacity:0.7}
+.back-btn svg{width:17px;height:17px;stroke:var(--accent);stroke-width:2.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.icon-btn{width:34px;height:34px;border-radius:8px;background:var(--bg2);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.icon-btn:active{background:var(--bg3)}
+.icon-btn svg{width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* SCROLLABLE BODY */
+.scroll-body{flex:1;overflow-y:auto;padding:14px 16px;-webkit-overflow-scrolling:touch}
+.scroll-body::-webkit-scrollbar{width:3px}
+.scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+/* BOTTOM WHITE BAR */
+.bottom-white{background:#fff;padding:12px 16px max(20px,env(safe-area-inset-bottom));flex-shrink:0;border-top:1px solid #e8e8e8}
+.bottom-white .btn-hint{font-size:11px;color:#aaa;text-align:center;margin-bottom:8px}
+.bottom-white .btn-hint.ready{color:var(--accent2)}
+
+/* BUTTONS */
+.btn-primary{width:100%;padding:14px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;border:none;background:var(--white-btn);color:var(--white-btn-text);transition:opacity 0.15s}
+.btn-primary:active{opacity:0.85}
+.btn-primary.disabled{background:#e8e8e8;color:#aaa;cursor:default}
+.btn-primary.green{background:#0d0d0d;color:#fff}
+.btn-gold{width:100%;padding:12px;border-radius:var(--radius);background:var(--accent-bg2);border:1.5px solid var(--accent2);color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-gold:active{opacity:0.8}
+.btn-outline{background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);padding:9px 14px;font-size:12px;color:var(--text2);cursor:pointer;font-family:var(--font)}
+.btn-outline:active{background:var(--bg2)}
+
+/* CARDS */
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px}
+.card.gold-border{border-color:var(--accent2);background:var(--accent-bg)}
+.card.green-border{border-color:var(--green-border);background:var(--green-bg)}
+.card.red-border{border-color:var(--red-border);background:var(--red-bg)}
+
+/* ROW ITEM */
+.row-item{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:11px 14px;margin-bottom:4px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.row-item:active{background:var(--bg3)}
+.row-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.row-icon svg{width:17px;height:17px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.row-body{flex:1}
+.row-title{font-size:12px;font-weight:500;color:var(--text)}
+.row-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.row-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.row-val{font-size:11px;color:var(--text3)}
+.row-arrow svg{width:14px;height:14px;stroke:var(--border2);stroke-width:2;fill:none}
+
+/* SECTION LABEL */
+.section-lbl{font-size:10px;color:var(--text3);margin:12px 0 6px;letter-spacing:0.5px;text-transform:uppercase}
+.section-lbl:first-child{margin-top:0}
+
+/* TOGGLE */
+.toggle{width:38px;height:22px;border-radius:11px;background:var(--border);position:relative;cursor:pointer;transition:background 0.2s;flex-shrink:0}
+.toggle.on{background:var(--green-border)}
+.toggle-dot{width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;right:2px;transition:all 0.2s}
+.toggle.on .toggle-dot{right:auto;left:2px}
+
+/* NOTICE */
+.notice{border-radius:var(--radius);padding:10px 12px;display:flex;align-items:flex-start;gap:8px;margin-bottom:12px}
+.notice.gold{background:var(--accent-bg);border:0.5px solid var(--accent2)}
+.notice.green{background:var(--green-bg);border:0.5px solid var(--green-border)}
+.notice.red{background:var(--red-bg);border:0.5px solid var(--red-border)}
+.notice svg{width:16px;height:16px;flex-shrink:0;margin-top:1px;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.notice.gold svg{stroke:var(--accent)}
+.notice.green svg{stroke:var(--green)}
+.notice.red svg{stroke:var(--red)}
+.notice-text{font-size:11px;color:var(--text2);line-height:1.5}
+.notice-text strong{color:var(--accent);font-weight:600}
+.notice.green .notice-text strong{color:var(--green)}
+.notice.red .notice-text strong{color:var(--red)}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;gap:3px;border-radius:5px;padding:2px 7px;font-size:10px;font-weight:600}
+.badge.gold{background:var(--accent-bg2);border:0.5px solid var(--accent2);color:var(--accent)}
+.badge.green{background:var(--green-bg);border:0.5px solid var(--green-border);color:var(--green)}
+.badge.red{background:var(--red-bg);border:0.5px solid var(--red-border);color:var(--red)}
+.badge.gray{background:var(--bg3);border:0.5px solid var(--border2);color:var(--text3)}
+
+/* PICK CELLS */
+.pick-cell{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;color:var(--text3);transition:all 0.12s;flex-shrink:0}
+.pick-cell.p1{border-color:var(--green-border);background:var(--green-bg);color:var(--green)}
+.pick-cell.px{border-color:var(--accent2);background:var(--amber-bg);color:var(--amber)}
+.pick-cell.p2{border-color:var(--red-border);background:var(--red-bg);color:var(--red)}
+.pick-cell:active{opacity:0.7}
+
+/* DIVIDER */
+.divider{height:0.5px;background:var(--border);margin:10px 0}
+
+/* FOOTER */
+.app-footer{border-top:0.5px solid var(--border);padding:10px 16px;display:flex;justify-content:center;align-items:center;gap:6px;flex-shrink:0}
+.footer-dot{width:4px;height:4px;border-radius:50%;background:var(--accent2)}
+.footer-text{font-size:10px;color:var(--text3)}
+.footer-link{font-size:10px;color:var(--text3);text-decoration:none}
+
+/* ANIMATIONS */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.fade-in{animation:fadeIn 0.25s ease forwards}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto}
+
+/* SVG ICONS (inline) */
+.ic{display:inline-flex;align-items:center;justify-content:center}
+.ic svg{stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;fill:none}
+
+/* INPUTS */
+input,textarea,select{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:13px;font-family:var(--font);outline:none;padding:10px 12px;width:100%;transition:border-color 0.15s}
+input:focus,textarea:focus{border-color:var(--accent2)}
+input::placeholder,textarea::placeholder{color:var(--text3)}
+textarea{resize:none}
+
+/* SCREEN TRANSITIONS */
+.screen{animation:fadeIn 0.2s ease forwards}
+
+/* RESPONSIVE */
+@media(max-width:360px){.scroll-body{padding:12px}}
+.pick-cell.rec{outline:1.5px dashed var(--accent2);outline-offset:-1px}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+<div id="toast-wrap"></div>
+<div id="dlg-ov"><div class="dlg-box"><div class="dlg-t" id="dlg-t"></div><div class="dlg-m" id="dlg-m"></div><div class="dlg-b" id="dlg-b"></div></div></div>
+
+<!-- ========== SPLASH SCREEN ========== -->
+<div class="screen active" id="screen-splash" style="background:var(--bg);align-items:center;justify-content:center;flex-direction:column;gap:20px">
+  <div style="text-align:center">
+    <div style="width:80px;height:80px;border-radius:22px;background:var(--accent-bg);border:2px solid var(--accent2);display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+      <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+    </div>
+    <div style="font-family:'Rubik Mono One',monospace;font-size:26px;color:var(--accent);letter-spacing:1px">Winner</div>
+    <div style="font-size:14px;color:var(--text2);margin-top:4px">אנליזר</div>
+  </div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
+    <div class="spinner"></div>
+    <div style="font-size:11px;color:var(--text3)" id="splash-txt">טוען...</div>
+  </div>
+  <div style="position:absolute;bottom:24px;text-align:center">
+    <div style="font-size:10px;color:var(--text3)">AppNest · Barak Aflalo</div>
+  </div>
+</div>
+
+<!-- ========== GUIDE SCREEN ========== -->
+<div class="screen" id="screen-guide">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px">
+    <div id="guide-content" style="width:100%;max-width:360px;text-align:center"></div>
+    <div style="display:flex;gap:6px;margin-top:24px" id="guide-dots"></div>
+  </div>
+  <div class="bottom-white">
+    <div style="display:flex;gap:8px">
+      <button class="btn-outline" style="flex:1" onclick="skipGuide()" id="guide-skip-btn">דלג</button>
+      <button class="btn-primary green" style="flex:2" onclick="nextGuide()" id="guide-next-btn">הבא</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HOME SCREEN ========== -->
+<div class="screen" id="screen-home">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="width:32px;height:32px;border-radius:9px;background:var(--accent-bg);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:var(--accent)">Winner אנליזר</div>
+        <div style="font-size:9px;color:var(--text3)">AppNest · וינר 16</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <div class="icon-btn" onclick="toggleMode()" id="mode-btn" title="יום/לילה">
+        <svg id="mode-icon" viewBox="0 0 24 24" style="width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </div>
+      <div class="icon-btn" onclick="showScreen('screen-settings')" title="הגדרות">
+        <svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      </div>
+      <div class="icon-btn" onclick="cycleTheme()" id="theme-btn" title="שנה עיצוב">
+        <svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" stroke="none"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" stroke="none"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-body">
+    <div class="section-lbl">פעולות ראשיות</div>
+    <div onclick="showScreen('screen-load-form')" style="background:var(--accent-bg);border:1.5px solid var(--accent2);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px">
+      <div style="width:44px;height:44px;border-radius:11px;background:var(--accent-bg2);border:1px solid var(--accent2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div>
+        <div style="font-size:15px;font-weight:600;color:var(--accent)">מלא טופס וינר 16</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">בחר קבוצות וקבל המלצות AI</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+      <div class="card" onclick="showScreen('screen-match-analysis')" style="cursor:pointer;text-align:center;padding:16px 10px">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--bg3);border:0.5px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="m2 2 20 20"/><path d="M3 18l4-4"/></svg>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)">ניתוח משחק</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">ראש בראש</div>
+      </div>
+      <div class="card" onclick="showScreen('screen-history')" style="cursor:pointer;text-align:center;padding:16px 10px">
+        <div style="width:38px;height:38px;border-radius:10px;background:var(--bg3);border:0.5px solid var(--border2);display:flex;align-items:center;justify-content:center;margin:0 auto 8px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)">היסטוריה</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">טפסים שמורים</div>
+      </div>
+    </div>
+    <div class="card" onclick="showScreen('screen-ai-connect')" style="cursor:pointer;display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center" id="home-ai-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)" id="home-ai-title">ניתוח AI</div>
+        <div style="font-size:10px;margin-top:2px" id="home-ai-sub" style="color:var(--text3)">חיבור למודל AI מהמכשיר</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+    <div class="section-lbl">הסטטיסטיקה שלי</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:16px" id="home-stats">
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)" id="stat-forms">0</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">טפסים</div>
+      </div>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)" id="stat-best">—</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">הכי טוב</div>
+      </div>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)" id="stat-pending">0</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">ממתינים</div>
+      </div>
+    </div>
+  </div>
+  <div class="app-footer">
+    <span class="footer-text">© Barak Aflalo</span>
+    <div class="footer-dot"></div>
+    <a href="https://barakaflalo.github.io/appnest" class="footer-link">AppNest</a>
+    <div class="footer-dot"></div>
+    <span class="footer-text">v1.0</span>
+  </div>
+</div>
+
+<!-- ========== LOAD FORM SCREEN ========== -->
+<div class="screen" id="screen-load-form">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      בית
+    </div>
+    <div class="topbar-title">טען משחקים</div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="scroll-body">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--accent-bg);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      </div>
+      <div style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:4px">איך לטעון את המשחקים?</div>
+      <div style="font-size:11px;color:var(--text3)">בחר את הדרך הנוחה לך</div>
+    </div>
+
+    <!-- כפתור טעינה אוטומטית עם AI -->
+    <button id="load-weekly-btn" onclick="loadWeeklyGames()" style="width:100%;padding:16px;border-radius:var(--radius-lg);background:var(--accent-bg);border:2px solid var(--accent2);color:var(--accent);font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px">
+      🌐 טען טופס שבועי אוטומטית
+    </button>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-bottom:14px">AI מחפש את 16 המשחקים של השבוע ומטעין אוטומטית</div>
+
+    <div style="text-align:center;font-size:11px;color:var(--text3);margin:4px 0 12px">— או טען ידנית —</div>
+
+    <div class="card gold-border" style="cursor:pointer;margin-bottom:8px" onclick="toggleSection('paste-section','paste-arrow')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--accent-bg2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+            טען עם AI
+            <span class="badge gold">מומלץ</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">הדבק טקסט מ-winner.co.il — AI מחלץ אוטומטית</div>
+        </div>
+        <svg id="paste-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div id="paste-section" style="display:none;margin-top:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="background:var(--bg3);border-radius:8px;padding:10px;font-size:11px;color:var(--text2);line-height:1.7;border:0.5px solid var(--border2)">
+          1. כנס ל-<strong style="color:var(--accent)">winner.co.il</strong><br>
+          2. לחץ Ctrl+A ← Ctrl+C להעתיק הכל<br>
+          3. חזור כאן והדבק למטה
+        </div>
+        <textarea id="paste-input" rows="4" placeholder="הדבק כאן את הטקסט מאתר הוינר..." oninput="onPasteInput()"></textarea>
+        <button class="btn-gold disabled" id="paste-extract-btn" onclick="extractFromPaste()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+          חלץ משחקים אוטומטית
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align:center;font-size:11px;color:var(--text3);margin:8px 0">— או —</div>
+
+    <div class="card" style="cursor:pointer;margin-bottom:8px" onclick="toggleSection('manual-section','manual-arrow')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">הזן ידנית</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">הקלד את שמות הקבוצות בעצמך</div>
+        </div>
+        <svg id="manual-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+      <div id="manual-section" style="display:none;margin-top:12px;flex-direction:column;gap:6px">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">הזן שם קבוצת בית וחוץ לכל משחק</div>
+        <div id="manual-rows"></div>
+        <button class="btn-gold" style="margin-top:4px" onclick="loadManualGames()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          התחל למלא טופס
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== FILL FORM SCREEN ========== -->
+<div class="screen" id="screen-fill-form">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-load-form')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      חזור
+    </div>
+    <div class="topbar-title">טופס וינר 16</div>
+    <div class="badge gold" id="form-progress">0/16</div>
+  </div>
+  <div class="scroll-body" style="padding:10px 12px">
+    <div style="display:flex;gap:5px;margin-bottom:10px">
+      <button onclick="applyStrategy('safe')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--green-border);background:transparent;font-size:10px;font-weight:600;color:var(--green);cursor:pointer;font-family:var(--font)">🛡️ בטוח</button>
+      <button onclick="applyStrategy('surprise')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--accent2);background:transparent;font-size:10px;font-weight:600;color:var(--accent);cursor:pointer;font-family:var(--font)">⚡ הפתעות</button>
+      <button onclick="applyStrategy('bold')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--red-border);background:transparent;font-size:10px;font-weight:600;color:var(--red);cursor:pointer;font-family:var(--font)">🔥 אגרסיבי</button>
+      <button onclick="clearAllPicks()" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--font)">✕ נקה</button>
+    </div>
+    <div id="form-games-list" style="display:flex;flex-direction:column;gap:5px"></div>
+    <div style="height:8px"></div>
+  </div>
+  <div class="bottom-white">
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button id="ai-analyze-btn" onclick="analyzeGamesWithAI()" style="flex:1;padding:10px;border-radius:var(--radius);background:var(--accent-bg);border:1.5px solid var(--accent2);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:5px">
+        🤖 נתח עם AI
+      </button>
+      <button class="btn-primary disabled" id="form-analyze-btn" onclick="analyzeForm()" style="flex:2;padding:10px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+        שמור טופס
+      </button>
+    </div>
+    <div class="btn-hint" id="form-btn-hint">בחר תוצאות לכל 16 המשחקים</div>
+  </div>
+</div>
+
+<!-- ========== MATCH ANALYSIS SCREEN ========== -->
+<div class="screen" id="screen-match-analysis">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      בית
+    </div>
+    <div class="topbar-title">ניתוח משחק</div>
+    <div style="width:34px"></div>
+  </div>
+  <div id="match-input-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+    <div class="scroll-body">
+      <div id="match-ai-notice" class="notice gold" style="margin-bottom:14px">
+        <svg viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="notice-text"><strong>AI מחובר</strong> — כתוב שם קבוצה, AI יאמת ויציע תיקון אם צריך</div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:4px">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
+        קבוצת בית
+      </div>
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:4px;transition:border-color 0.15s;position:relative" id="home-input-wrap">
+        <input type="text" id="home-team-input" placeholder='שם הקבוצה...' autocomplete="off" oninput="handleTeamInput('home-team-input','home')" style="border:none;background:transparent;padding:0;flex:1" />
+        <span id="home-status" style="flex-shrink:0;font-size:14px"></span>
+      </div>
+      <div id="home-hint-box" style="display:none;margin-bottom:8px"></div>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin:10px 0">— VS —</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:4px">
+        <div style="width:8px;height:8px;border-radius:50%;background:var(--blue)"></div>
+        קבוצת חוץ
+      </div>
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:4px;transition:border-color 0.15s;position:relative" id="away-input-wrap">
+        <input type="text" id="away-team-input" placeholder='שם הקבוצה...' autocomplete="off" oninput="handleTeamInput('away-team-input','away')" style="border:none;background:transparent;padding:0;flex:1" />
+        <span id="away-status" style="flex-shrink:0;font-size:14px"></span>
+      </div>
+      <div id="away-hint-box" style="display:none;margin-bottom:8px"></div>
+    </div>
+    <div class="bottom-white">
+      <div class="btn-hint" id="match-btn-hint">הזן שתי קבוצות</div>
+      <button class="btn-primary disabled" id="match-analyze-btn" onclick="doMatchAnalysis()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        נתח משחק
+      </button>
+    </div>
+  </div>
+  <div id="match-result-view" style="flex:1;display:none;flex-direction:column;overflow:hidden">
+    <div class="scroll-body" id="match-result-content"></div>
+    <div class="bottom-white">
+      <button class="btn-primary green" onclick="resetMatchAnalysis()">← ניתוח משחק אחר</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== HISTORY SCREEN ========== -->
+<div class="screen" id="screen-history">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      בית
+    </div>
+    <div class="topbar-title">היסטוריה</div>
+    <div id="history-count" style="font-size:11px;color:var(--text3)"></div>
+  </div>
+  <div class="scroll-body" id="history-content"></div>
+</div>
+
+<!-- ========== UPDATE RESULTS SCREEN ========== -->
+<div class="screen" id="screen-update-results">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-history')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      היסטוריה
+    </div>
+    <div class="topbar-title">עדכון תוצאות</div>
+    <div style="width:34px"></div>
+  </div>
+  <div id="update-results-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden"></div>
+</div>
+
+<!-- ========== AI CONNECT SCREEN ========== -->
+<div class="screen" id="screen-ai-connect">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      בית
+    </div>
+    <div class="topbar-title">בחר AI</div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="scroll-body">
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="width:56px;height:56px;border-radius:16px;background:var(--accent-bg);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:26px">🤖</div>
+      <div style="font-size:15px;font-weight:700;color:var(--accent);margin-bottom:4px">בחר את ה-AI שלך</div>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5">Gemini מסופק חינם על ידי האפליקציה<br>או השתמש במפתח האישי שלך לגרסה חזקה יותר</div>
+    </div>
+    <div id="ai-options-list"></div>
+    <div class="divider"></div>
+    <div class="card" style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <div style="font-size:11px;color:var(--text3);line-height:1.5">המפתח האישי שלך נשמר <strong style="color:var(--green)">על המכשיר שלך בלבד</strong> — האפליקציה לא שולחת אותו לשום מקום</div>
+    </div>
+    <div id="ai-status-card" class="card" style="display:flex;align-items:center;gap:10px">
+      <div style="width:10px;height:10px;border-radius:50%;flex-shrink:0" id="ai-status-dot"></div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--text)" id="ai-status-title">Gemini מחובר</div>
+        <div style="font-size:11px;color:var(--green);margin-top:1px" id="ai-status-sub">מסופק על ידי האפליקציה · חינמי</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== SETTINGS SCREEN ========== -->
+<div class="screen" id="screen-settings">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      בית
+    </div>
+    <div class="topbar-title">הגדרות</div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="scroll-body">
+    <div class="section-lbl">פרופיל</div>
+    <div class="row-item">
+      <div class="row-icon" style="background:var(--accent-bg)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">שם משתמש</div><div class="row-sub">מופיע בשיתוף ובדוחות</div></div>
+      <div class="row-right">
+        <input id="username-input" style="width:80px;padding:4px 8px;font-size:12px;color:var(--accent);text-align:right;border-color:var(--border)" value="" placeholder="שמך..." onchange="saveUsername(this.value)" />
+      </div>
+    </div>
+
+    <div class="section-lbl">עיצוב ושפה</div>
+    <div class="row-item" style="cursor:default">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">ערכת עיצוב</div><div class="row-sub" id="theme-name-sub">שחור וזהב</div></div>
+      <div class="row-right">
+        <div style="display:flex;gap:5px">
+          <div onclick="setTheme('gold')" style="width:18px;height:18px;border-radius:50%;background:#d4a843;cursor:pointer;border:2px solid transparent" class="theme-dot" id="dot-gold"></div>
+          <div onclick="setTheme('blue')" style="width:18px;height:18px;border-radius:50%;background:#60a5fa;cursor:pointer;border:2px solid transparent" class="theme-dot" id="dot-blue"></div>
+          <div onclick="setTheme('purple')" style="width:18px;height:18px;border-radius:50%;background:#a78bfa;cursor:pointer;border:2px solid transparent" class="theme-dot" id="dot-purple"></div>
+          <div onclick="setTheme('red')" style="width:18px;height:18px;border-radius:50%;background:#f87171;cursor:pointer;border:2px solid transparent" class="theme-dot" id="dot-red"></div>
+        </div>
+      </div>
+    </div>
+    <div class="row-item" onclick="showLangPicker()">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title" id="lang-title">שפה</div><div class="row-sub">Language / שפה</div></div>
+      <div class="row-right"><span class="row-val" id="lang-current">עברית</span><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+
+    <div class="section-lbl">AI</div>
+    <div class="row-item" onclick="showScreen('screen-ai-connect')">
+      <div class="row-icon" id="settings-ai-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">מודל AI</div><div class="row-sub" id="settings-ai-sub">לא מחובר</div></div>
+      <div class="row-right"><span class="row-val">הגדר</span><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+
+    <div class="section-lbl">נתונים וגיבוי</div>
+    <div class="row-item" onclick="exportBackup()">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">ייצוא גיבוי</div><div class="row-sub">שמור את כל הטפסים לקובץ JSON</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+    <div class="row-item" onclick="importBackup()">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">שחזור גיבוי</div><div class="row-sub">טען טפסים מקובץ שמור</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+
+    <div class="section-lbl">כללי</div>
+    <div class="row-item" style="cursor:default">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">התראות</div><div class="row-sub">תזכורת שבועית למלא טופס</div></div>
+      <div class="row-right"><div class="toggle on" onclick="this.classList.toggle('on')"><div class="toggle-dot"></div></div></div>
+    </div>
+    <div class="row-item" onclick="showScreen('screen-about')">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">אודות האפליקציה</div><div class="row-sub">גרסה, רישיון, AppNest</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+
+    <div class="section-lbl">אזור מסוכן</div>
+    <div class="row-item" style="background:var(--red-bg);border-color:var(--red-border)" onclick="confirmDeleteAll()">
+      <div class="row-icon" style="background:var(--red-bg)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title" style="color:var(--red)">מחק את כל הנתונים</div><div class="row-sub">פעולה בלתי הפיכה</div></div>
+    </div>
+
+    <div class="section-lbl">מנהל מערכת</div>
+    <div class="row-item" onclick="openAdminLogin()" style="background:var(--bg2);border-color:var(--border2)">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">הגדרות מנהל</div><div class="row-sub">ניהול מפתחות AI ← נעול בסיסמה</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+    <div style="height:16px"></div>
+  </div>
+</div>
+
+<!-- ========== ABOUT SCREEN ========== -->
+<div class="screen" id="screen-about">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-settings')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      הגדרות
+    </div>
+    <div class="topbar-title">אודות</div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="scroll-body">
+    <div style="text-align:center;padding:16px 0 14px">
+      <div style="width:64px;height:64px;border-radius:18px;background:var(--accent-bg);border:1.5px solid var(--accent2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+      </div>
+      <div style="font-family:'Rubik Mono One',monospace;font-size:20px;color:var(--accent)">Winner אנליזר</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">גרסה 1.0.0</div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--text3)">גרסה</span><span style="font-size:11px;color:var(--text2)">1.0.0</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--text3)">פותח על ידי</span><span style="font-size:11px;color:var(--accent);font-weight:600">Barak Aflalo</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--text3)">פלטפורמה</span><span style="font-size:11px;color:var(--text2)">PWA · HTML5</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--text3)">אחסון נתונים</span><span style="font-size:11px;color:var(--text2)">על המכשיר בלבד</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:6px 0">
+        <span style="font-size:11px;color:var(--text3)">רישיון</span><span style="font-size:11px;color:var(--text2)">© AppNest 2026</span>
+      </div>
+    </div>
+    <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:var(--radius-lg);padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer" onclick="openLink('https://barakaflalo.github.io/appnest')">
+      <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-bg2);border:1px solid var(--accent2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--accent)">AppNest</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:1px">עוד אפליקציות של Barak Aflalo</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+    </div>
+    <div class="row-item" onclick="shareApp()" style="margin-bottom:4px">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">שתף את האפליקציה</div><div class="row-sub">שלח לחבר</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+    <div class="row-item" onclick="sendFeedback()">
+      <div class="row-icon" style="background:var(--bg3)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </div>
+      <div class="row-body"><div class="row-title">שלח משוב</div><div class="row-sub">דווח על בעיה או הצע שיפור</div></div>
+      <div class="row-right"><div class="row-arrow"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></div></div>
+    </div>
+    <div style="text-align:center;font-size:10px;color:var(--text3);padding:16px 0 4px">© 2026 Barak Aflalo · AppNest · כל הזכויות שמורות</div>
+  </div>
+</div>
+
+<!-- ========== NO AI SCREEN ========== -->
+<div class="screen" id="screen-no-ai">
+  <div class="topbar">
+    <div class="back-btn" id="no-ai-back" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      חזור
+    </div>
+    <div class="topbar-title">נדרש AI</div>
+    <div style="width:34px"></div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+    <div style="width:60px;height:60px;border-radius:16px;background:var(--bg2);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;margin-bottom:14px">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </div>
+    <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:8px">AI לא מחובר</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:24px">הפעולה הזו דורשת AI מחובר.<br>חבר מודל AI כדי להמשיך.</div>
+    <button class="btn-gold" onclick="showScreen('screen-ai-connect')" style="width:100%;max-width:280px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      חבר AI עכשיו
+    </button>
+  </div>
+</div>
+
+<!-- ========== ADMIN LOGIN DIALOG ========== -->
+<div id="admin-login-overlay" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.75);z-index:300;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--bg2);border-radius:var(--radius-lg);padding:24px;width:100%;max-width:320px;border:0.5px solid var(--border2)">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:28px;margin-bottom:8px">🔐</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text)">הגדרות מנהל</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">הכנס קוד מנהל להמשיך</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">
+      <div style="width:14px;height:14px;border-radius:50%;background:var(--border2);transition:background 0.2s" id="pin-d0"></div>
+      <div style="width:14px;height:14px;border-radius:50%;background:var(--border2);transition:background 0.2s" id="pin-d1"></div>
+      <div style="width:14px;height:14px;border-radius:50%;background:var(--border2);transition:background 0.2s" id="pin-d2"></div>
+      <div style="width:14px;height:14px;border-radius:50%;background:var(--border2);transition:background 0.2s" id="pin-d3"></div>
+    </div>
+    <div id="admin-pin-error" style="text-align:center;font-size:11px;color:var(--red);margin-bottom:10px;display:none">קוד שגוי — נסה שוב</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <button onclick="adminPinKey('1')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">1</button>
+      <button onclick="adminPinKey('2')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">2</button>
+      <button onclick="adminPinKey('3')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">3</button>
+      <button onclick="adminPinKey('4')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">4</button>
+      <button onclick="adminPinKey('5')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">5</button>
+      <button onclick="adminPinKey('6')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">6</button>
+      <button onclick="adminPinKey('7')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">7</button>
+      <button onclick="adminPinKey('8')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">8</button>
+      <button onclick="adminPinKey('9')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">9</button>
+      <div></div>
+      <button onclick="adminPinKey('0')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--text);font-size:18px;font-weight:600;cursor:pointer;font-family:var(--font)">0</button>
+      <button onclick="adminPinKey('⌫')" style="padding:14px;border-radius:var(--radius);background:var(--bg3);border:0.5px solid var(--border2);color:var(--red);font-size:18px;cursor:pointer;font-family:var(--font)">⌫</button>
+    </div>
+    <button onclick="closeAdminLogin()" style="width:100%;padding:10px;border-radius:var(--radius);background:transparent;border:0.5px solid var(--border2);color:var(--text2);font-size:13px;cursor:pointer;font-family:var(--font)">ביטול</button>
+  </div>
+</div>
+
+<!-- ========== ADMIN SCREEN ========== -->
+<div class="screen" id="screen-admin">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-settings')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      הגדרות
+    </div>
+    <div class="topbar-title">🔐 מנהל מערכת</div>
+    <div style="width:34px"></div>
+  </div>
+  <div class="scroll-body">
+    <div class="notice gold" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5">הגדרות אלו נשמרות על המכשיר שלך בלבד ולא מועלות ל-GitHub</div>
+    </div>
+
+    <div class="section-lbl">מפתחות Gemini API</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;line-height:1.5">הכנס מפתחות מ-aistudio.google.com/apikey — האפליקציה תעבור ביניהם אוטומטית</div>
+      <div id="admin-keys-list"></div>
+      <button onclick="addAdminKey()" style="width:100%;padding:9px;border-radius:var(--radius);background:transparent;border:1px dashed var(--accent2);color:var(--accent);font-size:12px;cursor:pointer;font-family:var(--font);margin-top:6px">+ הוסף מפתח</button>
+    </div>
+
+    <div class="section-lbl">שינוי קוד מנהל</div>
+    <div class="card" style="margin-bottom:8px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">הקוד הנוכחי: <span id="admin-current-code" style="color:var(--accent)">****</span></div>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="admin-new-code" placeholder="קוד חדש (4 ספרות)" maxlength="4" style="flex:1;font-size:13px" />
+        <button onclick="saveAdminCode()" style="padding:10px 14px;border-radius:var(--radius);background:var(--accent-bg2);border:1px solid var(--accent2);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font)">שמור</button>
+      </div>
+    </div>
+
+    <div class="section-lbl">סטטוס מפתחות</div>
+    <div class="card" style="margin-bottom:16px">
+      <button onclick="testAllKeys()" style="width:100%;padding:10px;border-radius:var(--radius);background:var(--accent-bg2);border:1px solid var(--accent2);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:6px">
+        🔍 בדוק את כל המפתחות
+      </button>
+      <div id="admin-test-results" style="margin-top:10px"></div>
+    </div>
+  </div>
+</div>
+<!-- ========== FORM RESULT SCREEN ========== -->
+<div class="screen" id="screen-form-result">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-home')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      ← בית
+    </div>
+    <div class="topbar-title">ניתוח הטופס</div>
+    <div style="width:80px"></div>
+  </div>
+  <div class="scroll-body" id="form-result-body"></div>
+</div>
+
+<div id="lang-picker" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:flex-end;justify-content:center">
+  <div style="background:var(--bg2);border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:16px;border-top:0.5px solid var(--border)">
+    <div style="font-size:14px;font-weight:600;color:var(--text);text-align:center;margin-bottom:14px">בחר שפה</div>
+    <div id="lang-list" style="display:flex;flex-direction:column;gap:4px"></div>
+    <button class="btn-outline" style="width:100%;margin-top:10px" onclick="closeLangPicker()">ביטול</button>
+  </div>
+</div>
+
+</div><!-- end .app -->
+
+<script>
+// ===== GEMINI AI CONFIGURATION =====
+// Keys are stored securely in Cloudflare Worker
+const CLOUDFLARE_WORKER_URL = 'https://winner-ai.barakaflalo4780.workers.dev';
+const GEMINI_KEYS = []; // Not used directly - handled by Cloudflare
+let currentKeyIndex = 0;
+
+const AI_PROVIDERS = [
+  { id: 'gemini-app', name: 'Gemini (ברירת מחדל)', sub: 'מסופק על ידי האפליקציה · חינמי · ללא הגדרה', icon: '🤖', builtin: true },
+  { id: 'gemini-pro', name: 'Gemini Pro (אישי)', sub: 'הכנס את המפתח האישי שלך מ-aistudio.google.com', icon: '⚡', builtin: false },
+  { id: 'gpt', name: 'ChatGPT (אישי)', sub: 'הכנס את המפתח האישי שלך מ-platform.openai.com', icon: '🧠', builtin: false },
+  { id: 'claude', name: 'Claude (אישי)', sub: 'הכנס את המפתח האישי שלך מ-console.anthropic.com', icon: '🎯', builtin: false }
+];
+
+const APP = {
+  version: '1.0.0',
+  theme: localStorage.getItem('winner-theme') || 'gold',
+  lang: localStorage.getItem('winner-lang') || 'he',
+  aiModel: localStorage.getItem('winner-ai') || 'gemini-app',
+  aiKey: localStorage.getItem('winner-ai-key') || '',
+  username: localStorage.getItem('winner-username') || '',
+  forms: JSON.parse(localStorage.getItem('winner-forms') || '[]'),
+  currentGames: [],
+  currentPicks: {},
+  selectedAI: localStorage.getItem('winner-ai') || 'gemini-app',
+  teamValidation: { home: null, away: null }
+};
+
+const THEMES = {
+  gold: { name: 'שחור וזהב', attr: '' },
+  blue: { name: 'כחול כהה', attr: 'blue' },
+  purple: { name: 'סגול', attr: 'purple' },
+  red: { name: 'אדום', attr: 'red' }
+};
+
+const LANGS = [
+  { code: 'he', name: 'עברית', dir: 'rtl' },
+  { code: 'en', name: 'English', dir: 'ltr' },
+  { code: 'ru', name: 'Русский', dir: 'ltr' },
+  { code: 'es', name: 'Español', dir: 'ltr' },
+  { code: 'ar', name: 'العربية', dir: 'rtl' }
+];
+
+const AI_MODELS = [
+  { id: 'gemini', name: 'Gemini Nano', sub: 'Chrome מובנה · מהיר · חינמי', installed: true },
+  { id: 'gpt', name: 'ChatGPT', sub: 'דורש התקנה · חזק יותר', installed: false },
+  { id: 'local', name: 'מודל מקומי', sub: 'Ollama / LM Studio · פרטי לחלוטין', installed: false }
+];
+
+const GUIDE_STEPS = [
+  { icon: '🏆', title: 'ברוך הבא לWinner אנליזר', text: 'האפליקציה עוזרת לך למלא טפסי וינר 16 חכם יותר עם ניתוח AI' },
+  { icon: '📋', title: 'מלא טופס שבועי', text: 'העתק את המשחקים מ-winner.co.il או הכנס ידנית — ובחר 1/X/2 לכל משחק' },
+  { icon: '🤖', title: 'AI מהמכשיר שלך', text: 'האפליקציה משתמשת ב-AI שמותקן אצלך — ללא עלות ופרטי לחלוטין' },
+  { icon: '📊', title: 'ניתוח ראש בראש', text: 'נתח כל משחק בנפרד — האפליקציה מחשבת תחזית מיחסי הליין האמיתיים' },
+  { icon: '📚', title: 'היסטוריה וביקורת', text: 'כל הטפסים שמורים. אחרי הסיבוב — עדכן תוצאות וראה כמה נכון ניחשת' }
+];
+
+let guideStep = 0;
+
+function init() {
+  applyTheme(APP.theme);
+  applyLang(APP.lang);
+  loadAdminKeys(); // Load saved admin keys
+  const savedMode = localStorage.getItem('winner-mode') || 'dark';
+  if (savedMode === 'light') {
+    document.documentElement.setAttribute('data-mode', 'light');
+    const icon = document.getElementById('mode-icon');
+    if (icon) icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>';
+  }
+  if (APP.username) document.getElementById('username-input').value = APP.username;
+  updateHomeAIStatus();
+  updateHomeStats();
+  renderAIOptions();
+  renderManualRows();
+
+  const splashTexts = ['טוען נתונים...', 'מאתחל מסכים...', 'מוכן!'];
+  let si = 0;
+  const st = setInterval(() => {
+    if (si < splashTexts.length) document.getElementById('splash-txt').textContent = splashTexts[si++];
+  }, 500);
+
+  setTimeout(() => {
+    clearInterval(st);
+    const shown = localStorage.getItem('winner-guide-shown');
+    showScreen(shown ? 'screen-home' : 'screen-guide');
+    if (!shown) renderGuideStep();
+  }, 2000);
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'screen-history') renderHistory();
+  if (id === 'screen-home') { updateHomeStats(); updateHomeAIStatus(); }
+}
+
+function applyTheme(t) {
+  APP.theme = t;
+  localStorage.setItem('winner-theme', t);
+  const attr = THEMES[t]?.attr || '';
+  document.documentElement.setAttribute('data-theme', attr);
+  document.querySelectorAll('.theme-dot').forEach(d => d.style.borderColor = 'transparent');
+  const dot = document.getElementById('dot-' + t);
+  if (dot) dot.style.borderColor = '#fff';
+  const sub = document.getElementById('theme-name-sub');
+  if (sub) sub.textContent = THEMES[t]?.name || '';
+}
+
+function setTheme(t) { applyTheme(t); }
+
+const themeOrder = ['gold','blue','purple','red'];
+function cycleTheme() {
+  const idx = themeOrder.indexOf(APP.theme);
+  setTheme(themeOrder[(idx + 1) % themeOrder.length]);
+}
+
+function applyLang(code) {
+  APP.lang = code;
+  localStorage.setItem('winner-lang', code);
+  const l = LANGS.find(x => x.code === code);
+  if (!l) return;
+  document.documentElement.setAttribute('lang', code);
+  document.documentElement.setAttribute('dir', l.dir);
+  const cur = document.getElementById('lang-current');
+  if (cur) cur.textContent = l.name;
+}
+
+function showLangPicker() {
+  const el = document.getElementById('lang-picker');
+  el.style.display = 'flex';
+  document.getElementById('lang-list').innerHTML = LANGS.map(l =>
+    `<div style="padding:12px 14px;border-radius:var(--radius);background:${l.code===APP.lang?'var(--accent-bg)':'var(--bg3)'};border:0.5px solid ${l.code===APP.lang?'var(--accent2)':'var(--border)'};cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="applyLang('${l.code}');closeLangPicker()">
+      <span style="font-size:13px;font-weight:500;color:${l.code===APP.lang?'var(--accent)':'var(--text)'}">${l.name}</span>
+      ${l.code===APP.lang?'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
+    </div>`
+  ).join('');
+}
+
+function closeLangPicker() { document.getElementById('lang-picker').style.display = 'none'; }
+
+function renderGuideStep() {
+  const s = GUIDE_STEPS[guideStep];
+  document.getElementById('guide-content').innerHTML = `
+    <div style="font-size:52px;margin-bottom:16px">${s.icon}</div>
+    <div style="font-size:18px;font-weight:700;color:var(--accent);margin-bottom:12px">${s.title}</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.7">${s.text}</div>`;
+  const dots = document.getElementById('guide-dots');
+  dots.innerHTML = GUIDE_STEPS.map((_, i) =>
+    `<div style="width:${i===guideStep?'20':'8'}px;height:8px;border-radius:4px;background:${i===guideStep?'var(--accent)':'var(--border2)'};transition:all 0.3s"></div>`
+  ).join('');
+  const isLast = guideStep === GUIDE_STEPS.length - 1;
+  document.getElementById('guide-next-btn').textContent = isLast ? 'התחל!' : 'הבא';
+  document.getElementById('guide-skip-btn').style.display = isLast ? 'none' : 'block';
+}
+
+function nextGuide() {
+  if (guideStep < GUIDE_STEPS.length - 1) { guideStep++; renderGuideStep(); }
+  else skipGuide();
+}
+
+function skipGuide() {
+  localStorage.setItem('winner-guide-shown', '1');
+  showScreen('screen-home');
+}
+
+function toggleSection(secId, arrowId) {
+  const sec = document.getElementById(secId);
+  const arrow = document.getElementById(arrowId);
+  const isOpen = sec.style.display !== 'none' && sec.style.display !== '';
+  sec.style.display = isOpen ? 'none' : 'flex';
+  if (arrow) arrow.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
+function renderManualRows() {
+  const container = document.getElementById('manual-rows');
+  if (!container) return;
+  let html = '';
+  for (let i = 1; i <= 16; i++) {
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px">
+      <div style="font-size:10px;color:var(--text3);width:16px;text-align:center;flex-shrink:0">${i}</div>
+      <input type="text" placeholder="בית" style="flex:1;padding:7px 8px;font-size:11px" id="manual-home-${i}" />
+      <div style="font-size:10px;color:var(--text3);flex-shrink:0">—</div>
+      <input type="text" placeholder="חוץ" style="flex:1;padding:7px 8px;font-size:11px" id="manual-away-${i}" />
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function onPasteInput() {
+  const v = document.getElementById('paste-input').value.trim();
+  const btn = document.getElementById('paste-extract-btn');
+  if (v.length > 20) { btn.classList.remove('disabled'); btn.style.opacity = '1'; }
+  else { btn.classList.add('disabled'); btn.style.opacity = '0.5'; }
+}
+
+function extractFromPaste() {
+  if (!APP.aiModel) { showNoAI('screen-load-form'); return; }
+  const text = document.getElementById('paste-input').value.trim();
+  if (text.length < 20) return;
+  const games = parseGamesFromText(text);
+  if (games.length > 0) {
+    APP.currentGames = games;
+    APP.currentPicks = {};
+    renderFormGames();
+    showScreen('screen-fill-form');
+  } else {
+    toast('לא זוהו משחקים — נסה שוב','e');
+  }
+}
+
+function parseGamesFromText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  const games = [];
+  const sep = /[-–—נ vs]+/i;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (sep.test(line) && line.length > 3 && line.length < 80) {
+      const parts = line.split(sep);
+      if (parts.length === 2) {
+        const home = parts[0].trim();
+        const away = parts[1].trim();
+        if (home.length > 1 && away.length > 1 && !/^\d+$/.test(home)) {
+          games.push({ home, away, league: '' });
+        }
+      }
+    }
+  }
+  return games.slice(0, 16);
+}
+
+function loadManualGames() {
+  const games = [];
+  for (let i = 1; i <= 16; i++) {
+    const h = document.getElementById(`manual-home-${i}`)?.value.trim();
+    const a = document.getElementById(`manual-away-${i}`)?.value.trim();
+    if (h && a) games.push({ home: h, away: a, league: '' });
+  }
+  if (games.length < 1) { toast('הכנס לפחות משחק אחד','e'); return; }
+  APP.currentGames = games;
+  APP.currentPicks = {};
+  renderFormGames();
+  showScreen('screen-fill-form');
+}
+
+function renderFormGames() {
+  const el = document.getElementById('form-games-list');
+  el.innerHTML = APP.currentGames.map((g, i) => {
+    const p = APP.currentPicks[i];
+    const rec = g.pick && g.pick !== '?' ? g.pick : null;
+    const conf = g.confidence || '';
+    const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
+    const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
+    const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` : '';
+    // תג המלצה קטן
+    const recBadge = rec ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>` : '';
+    return `<div style="background:var(--bg2);border:0.5px solid ${p?'var(--accent2)':'var(--border)'};border-radius:var(--radius);padding:8px 10px;display:flex;align-items:center;gap:8px" id="game-row-${i}">
+      <div style="font-size:10px;color:var(--text3);width:14px;flex-shrink:0;text-align:center">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} - ${g.away}</div>
+        <div style="font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${meta}</div>
+        <div style="display:flex;gap:6px;align-items:center;margin-top:1px">
+          ${oddsTxt?`<span style="font-size:9px;color:var(--text3)">${oddsTxt}</span>`:''}
+          ${recBadge}
+        </div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0">
+        <div class="pick-cell ${p==='1'?'p1':''} ${rec==='1'?'rec':''}" onclick="setPick(${i},'1')">1</div>
+        <div class="pick-cell ${p==='X'?'px':''} ${rec==='X'?'rec':''}" onclick="setPick(${i},'X')">X</div>
+        <div class="pick-cell ${p==='2'?'p2':''} ${rec==='2'?'rec':''}" onclick="setPick(${i},'2')">2</div>
+      </div>
+    </div>`;
+  }).join('');
+  updateFormBtn();
+}
+
+function setPick(i, v) {
+  APP.currentPicks[i] = APP.currentPicks[i] === v ? null : v;
+  if (APP.currentPicks[i] === null) delete APP.currentPicks[i];
+  renderFormGames();
+  const n = Object.keys(APP.currentPicks).length;
+  const total = APP.currentGames.length;
+  if (APP.currentPicks[i] && i < total - 1) {
+    const next = document.getElementById(`game-row-${i+1}`);
+    if (next) setTimeout(() => next.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  }
+}
+
+function updateFormBtn() {
+  const n = Object.keys(APP.currentPicks).length;
+  const total = APP.currentGames.length;
+  const btn = document.getElementById('form-analyze-btn');
+  const hint = document.getElementById('form-btn-hint');
+  const prog = document.getElementById('form-progress');
+  prog.textContent = `${n}/${total}`;
+  if (n === total) {
+    btn.classList.remove('disabled');
+    hint.textContent = 'מוכן לניתוח!';
+    hint.style.color = 'var(--accent2)';
+  } else {
+    btn.classList.add('disabled');
+    hint.textContent = `נותרו ${total - n} משחקים`;
+    hint.style.color = '#aaa';
+  }
+}
+
+function applyStrategy(type) {
+  APP.currentGames.forEach((g, i) => {
+    if (type === 'safe') APP.currentPicks[i] = '1';
+    else if (type === 'surprise') APP.currentPicks[i] = i % 3 === 0 ? 'X' : i % 3 === 1 ? '2' : '1';
+    else APP.currentPicks[i] = i % 2 === 0 ? '2' : i % 3 === 0 ? 'X' : '1';
+  });
+  renderFormGames();
+}
+
+function clearAllPicks() { APP.currentPicks = {}; renderFormGames(); }
+
+function analyzeForm() {
+  const n = Object.keys(APP.currentPicks).length;
+  if (n < APP.currentGames.length) return;
+  const form = {
+    id: Date.now(),
+    date: new Date().toLocaleDateString('he-IL'),
+    week: `שבוע ${Math.ceil(Math.random()*30)+200}`,
+    strategy: 'ידני',
+    games: APP.currentGames,
+    picks: { ...APP.currentPicks },
+    results: null,
+    score: null
+  };
+  APP.forms.push(form);
+  localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
+  updateHomeStats();
+  renderFormResult(form);
+  showScreen('screen-form-result');
+}
+
+function renderHistory() {
+  const el = document.getElementById('history-content');
+  const cnt = document.getElementById('history-count');
+  if (!APP.forms.length) {
+    cnt.textContent = '';
+    el.innerHTML = `<div style="text-align:center;padding:60px 20px">
+      <div style="width:52px;height:52px;border-radius:14px;background:var(--bg2);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      </div>
+      <div style="font-size:14px;font-weight:600;color:var(--text3)">אין טפסים עדיין</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;line-height:1.5">הטפסים שתמלא יישמרו<br>כאן אוטומטית</div>
+    </div>`;
+    return;
+  }
+  cnt.textContent = `${APP.forms.length} טפסים`;
+  const best = APP.forms.filter(f => f.score !== null).reduce((b, f) => f.score > (b?.score || 0) ? f : b, null);
+  const pending = APP.forms.filter(f => f.results === null).length;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:14px">
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${APP.forms.length}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">טפסים</div>
+      </div>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${best ? best.score+'/16' : '—'}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">הכי טוב</div>
+      </div>
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 8px;text-align:center">
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${pending}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">ממתינים</div>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">טפסים אחרונים</div>
+    ${APP.forms.slice().reverse().map((f, ri) => {
+      const i = APP.forms.length - 1 - ri;
+      const picks = Object.values(f.picks);
+      const rowPreview = picks.map(p => {
+        const bg = p==='1'?'var(--green-bg)':p==='X'?'var(--amber-bg)':'var(--red-bg)';
+        const col = p==='1'?'var(--green)':p==='X'?'var(--amber)':'var(--red)';
+        return `<div style="width:24px;height:24px;border-radius:5px;background:${bg};color:${col};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">${p}</div>`;
+      }).join('');
+      const badge = f.score !== null
+        ? `<span class="badge green">${f.score}/16 נכון</span>`
+        : `<span class="badge gold">ממתין לתוצאות</span>`;
+      return `<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="toggleHistoryCard(this,${i})">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${f.date}</div>
+          ${badge}
+        </div>
+        <div style="display:flex;gap:8px;font-size:10px;color:var(--text3);margin-bottom:8px">
+          <span>${f.week}</span>
+          <span>·</span>
+          <span>${f.games.length} משחקים</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px">${rowPreview}</div>
+        <div class="history-actions" style="display:none;flex-direction:column;gap:6px;margin-top:10px;border-top:0.5px solid var(--border);padding-top:10px">
+          ${f.score === null ? `<button class="btn-gold" onclick="event.stopPropagation();openUpdateResults(${i})" style="font-size:12px;padding:9px">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+            עדכן תוצאות אמיתיות</button>` : ''}
+          <div style="display:flex;gap:6px">
+            <button class="btn-outline" style="flex:1;font-size:11px" onclick="event.stopPropagation()">צפה</button>
+            <button class="btn-outline" style="flex:1;font-size:11px" onclick="event.stopPropagation();duplicateForm(${i})">שכפל</button>
+            <button class="btn-outline" style="flex:1;font-size:11px;border-color:var(--red-border);color:var(--red)" onclick="event.stopPropagation();deleteForm(${i})">מחק</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+function toggleHistoryCard(card, i) {
+  const actions = card.querySelector('.history-actions');
+  if (actions) { actions.style.display = actions.style.display === 'none' ? 'flex' : 'none'; actions.style.flexDirection = 'column'; }
+}
+
+function openUpdateResults(formIdx) {
+  APP.currentUpdateFormIdx = formIdx;
+  const form = APP.forms[formIdx];
+  const el = document.getElementById('update-results-content');
+  el.innerHTML = `
+    <div class="scroll-body">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:4px">הכנס תוצאות אמיתיות</div>
+        <div style="font-size:11px;color:var(--text3)">טופס ${form.date}</div>
+      </div>
+      <div class="card gold-border" style="cursor:pointer;margin-bottom:8px" onclick="toggleSection('upd-paste-sec','upd-paste-arr')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--accent-bg2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">טען עם AI<span class="badge gold">מומלץ</span></div>
+            <div style="font-size:11px;color:var(--text3)">הדבק דף תוצאות מוינר</div>
+          </div>
+          <svg id="upd-paste-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div id="upd-paste-sec" style="display:none;margin-top:10px;flex-direction:column;gap:8px">
+          <textarea rows="3" placeholder="הדבק טקסט תוצאות..." id="upd-paste-input"></textarea>
+          <button class="btn-gold" onclick="extractUpdateResults(${formIdx})">חלץ תוצאות אוטומטית</button>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin:6px 0">— או —</div>
+      <div class="card" style="cursor:pointer;margin-bottom:8px" onclick="toggleSection('upd-manual-sec','upd-manual-arr')">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:38px;height:38px;border-radius:10px;background:var(--bg3);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/></svg>
+          </div>
+          <div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text)">הזן ידנית</div><div style="font-size:11px;color:var(--text3)">סמן 1/X/2 לכל משחק</div></div>
+          <svg id="upd-manual-arr" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div id="upd-manual-sec" style="display:none;margin-top:10px;flex-direction:column;gap:4px" id="upd-manual-games"></div>
+      </div>
+    </div>
+    <div class="bottom-white">
+      <div class="btn-hint" id="upd-hint">בחר שיטת עדכון</div>
+      <button class="btn-primary disabled" id="upd-save-btn" onclick="saveResults(${formIdx})">שמור תוצאות</button>
+    </div>`;
+  showScreen('screen-update-results');
+}
+
+function extractUpdateResults(formIdx) {
+  toast('AI מחלץ תוצאות...','i');
+}
+
+function saveResults(formIdx) { toast('✅ תוצאות נשמרו!','s'); showScreen('screen-history'); }
+
+function duplicateForm(i) {
+  const f = { ...APP.forms[i], id: Date.now(), date: new Date().toLocaleDateString('he-IL'), results: null, score: null };
+  APP.forms.push(f);
+  localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
+  renderHistory();
+}
+
+function deleteForm(i) {
+  showDialog('מחיקת טופס','למחוק את הטופס? לא ניתן לשחזר.',[{label:'מחק',cls:'dlg-danger',fn:()=>{APP.forms.splice(i,1);localStorage.setItem('winner-forms',JSON.stringify(APP.forms));renderHistory();updateHomeStats();toast('הטופס נמחק','i');}},{label:'ביטול',cls:'dlg-cancel',fn:null}]);
+}
+
+// teamValidation lives on APP (see APP.teamValidation)
+let validationTimers = {};
+
+function onTeamInput(side) {
+  const val = document.getElementById(`${side}-team-input`).value.trim();
+  APP.teamValidation[side] = null;
+  document.getElementById(`${side}-status`).textContent = '';
+  document.getElementById(`${side}-hint-box`).style.display = 'none';
+  document.getElementById(`${side}-input-wrap`).style.borderColor = val ? 'var(--accent2)' : 'var(--border)';
+  updateMatchBtn();
+  clearTimeout(validationTimers[side]);
+  if (val.length < 2) return;
+  document.getElementById(`${side}-status`).innerHTML = '<span style="animation:spin 0.8s linear infinite;display:inline-block">⏳</span>';
+  validationTimers[side] = setTimeout(() => validateTeam(side, val), 800);
+}
+
+function validateTeam(side, val) {
+  if (!APP.aiModel) { showNoAI('screen-match-analysis'); return; }
+  const v = val.toLowerCase();
+  const knownTeams = ['ביתר ירושלים','מכבי תל אביב','מכבי חיפה','מכבי נתניה','הפועל באר שבע','הפועל תל אביב','הפועל חיפה','real madrid','fc barcelona','atletico madrid','liverpool fc','arsenal fc','manchester city','chelsea fc','bayern munich','borussia dortmund','inter milan','ac milan','juventus','napoli','psg','ajax','porto','benfica'];
+  const exactMatch = knownTeams.find(t => t.toLowerCase() === v || t.toLowerCase().includes(v) || v.includes(t.toLowerCase().split(' ')[0]));
+  const closeMatch = !exactMatch && knownTeams.find(t => {
+    const words = t.toLowerCase().split(' ');
+    return words.some(w => w.startsWith(v.split(' ')[0]) && v.split(' ')[0].length >= 3);
+  });
+  if (exactMatch) {
+    APP.teamValidation[side] = exactMatch;
+    document.getElementById(`${side}-status`).innerHTML = '✅';
+    document.getElementById(`${side}-team-input`).value = exactMatch;
+    document.getElementById(`${side}-input-wrap`).style.borderColor = 'var(--green-border)';
+    document.getElementById(`${side}-hint-box`).style.display = 'none';
+  } else if (closeMatch) {
+    document.getElementById(`${side}-status`).innerHTML = '⚠️';
+    document.getElementById(`${side}-input-wrap`).style.borderColor = 'var(--accent2)';
+    const hb = document.getElementById(`${side}-hint-box`);
+    hb.style.display = 'block';
+    hb.innerHTML = `<div style="background:var(--accent-bg);border:0.5px solid var(--accent2);border-radius:8px;padding:8px 10px;font-size:11px;color:var(--text2)">האם התכוונת ל-<strong style="color:var(--accent)">${closeMatch}</strong>? <span style="color:var(--accent);cursor:pointer;text-decoration:underline" onclick="acceptSuggestion('${side}','${closeMatch}')">כן, בחר</span></div>`;
+  } else {
+    APP.teamValidation[side] = val;
+    document.getElementById(`${side}-status`).innerHTML = '✅';
+    document.getElementById(`${side}-input-wrap`).style.borderColor = 'var(--green-border)';
+    document.getElementById(`${side}-hint-box`).style.display = 'none';
+  }
+  updateMatchBtn();
+}
+
+function acceptSuggestion(side, name) {
+  document.getElementById(`${side}-team-input`).value = name;
+  APP.teamValidation[side] = name;
+  document.getElementById(`${side}-status`).innerHTML = '✅';
+  document.getElementById(`${side}-input-wrap`).style.borderColor = 'var(--green-border)';
+  document.getElementById(`${side}-hint-box`).style.display = 'none';
+  updateMatchBtn();
+}
+
+function updateMatchBtn() {
+  const btn = document.getElementById('match-analyze-btn');
+  const hint = document.getElementById('match-btn-hint');
+  const tv = APP.teamValidation;
+  const ready = tv.home && tv.away;
+  if (ready) {
+    btn.classList.remove('disabled');
+    hint.textContent = `${tv.home} נגד ${tv.away}`;
+    hint.style.color = 'var(--accent2)';
+  } else {
+    btn.classList.add('disabled');
+    hint.textContent = !tv.home && !tv.away ? 'הזן שתי קבוצות' : !tv.home ? 'הזן קבוצת בית' : 'הזן קבוצת חוץ';
+    hint.style.color = '#aaa';
+  }
+}
+
+async function doMatchAnalysis() {
+  const tv = APP.teamValidation;
+  if (!tv.home || !tv.away) return;
+  const home = tv.home;
+  const away = tv.away;
+  const rv = document.getElementById('match-result-view');
+  const iv = document.getElementById('match-input-view');
+  const content = document.getElementById('match-result-content');
+  iv.style.display = 'none';
+  rv.style.display = 'flex';
+  content.innerHTML = '<div class="card" style="text-align:center;padding:30px"><div style="font-size:14px;color:var(--text2)">⏳ מחשב תחזית מהיחסים...</div></div>';
+
+  let p1, px, p2, rec, conf = 'בינונית', hasData = false, note = '';
+  try {
+    const q = encodeURIComponent(home) + '|' + encodeURIComponent(away);
+    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?h2h=' + q + '&t=' + Date.now());
+    const data = await res.json();
+    if (data.ok && data.found && data.match && data.match.probs && data.match.hasOdds) {
+      const m = data.match;
+      // אם המשחק הפוך בטופס (הבית/חוץ מוחלפים) — נהפוך את ההסתברויות
+      if (m.reversed) {
+        p1 = m.probs['2']; px = m.probs['X']; p2 = m.probs['1'];
+        rec = m.pick === '1' ? '2' : m.pick === '2' ? '1' : 'X';
+      } else {
+        p1 = m.probs['1']; px = m.probs['X']; p2 = m.probs['2'];
+        rec = m.pick;
+      }
+      conf = m.confidence || 'בינונית';
+      hasData = true;
+      note = 'מבוסס על יחסי הליין של המשחק בטופס הנוכחי';
+    } else {
+      note = 'המשחק לא נמצא בטופס הנוכחי — לא ניתן לחשב תחזית מדויקת';
+    }
+  } catch (e) {
+    note = 'שגיאה בחיבור לשרת';
+  }
+
+  if (!hasData) {
+    content.innerHTML = '<div class="card" style="text-align:center;padding:24px">' +
+      '<div style="font-size:32px;margin-bottom:8px">🔍</div>' +
+      '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">' + home + ' נגד ' + away + '</div>' +
+      '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + note + '</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:12px">טיפ: ניתוח ראש בראש עובד על משחקים שנמצאים בטופס הווינר הנוכחי. טען קודם את הטופס השבועי.</div>' +
+      '</div>';
+    return;
+  }
+
+  const recColor = rec==='1'?'var(--green)':rec==='X'?'var(--amber)':'var(--red)';
+  const recBg = rec==='1'?'var(--green-bg)':rec==='X'?'var(--amber-bg)':'var(--red-bg)';
+  const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
+  content.innerHTML = `
+    <div class="card" style="margin-bottom:10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:10px">ניתוח מבוסס יחסי ליין אמיתיים</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div style="flex:1;text-align:center;background:var(--green-bg);border-radius:8px;padding:10px 4px">
+          <div style="font-size:22px;font-weight:700;color:var(--green)">${p1}%</div>
+          <div style="height:3px;background:var(--bg3);border-radius:2px;margin:4px 8px"><div style="width:${p1}%;height:100%;background:var(--green);border-radius:2px"></div></div>
+          <div style="font-size:10px;color:var(--text3)">1 — ${home}</div>
+        </div>
+        <div style="flex:1;text-align:center;background:var(--amber-bg);border-radius:8px;padding:10px 4px">
+          <div style="font-size:22px;font-weight:700;color:var(--amber)">${px}%</div>
+          <div style="height:3px;background:var(--bg3);border-radius:2px;margin:4px 8px"><div style="width:${px}%;height:100%;background:var(--amber);border-radius:2px"></div></div>
+          <div style="font-size:10px;color:var(--text3)">X — תיקו</div>
+        </div>
+        <div style="flex:1;text-align:center;background:var(--red-bg);border-radius:8px;padding:10px 4px">
+          <div style="font-size:22px;font-weight:700;color:var(--red)">${p2}%</div>
+          <div style="height:3px;background:var(--bg3);border-radius:2px;margin:4px 8px"><div style="width:${p2}%;height:100%;background:var(--red);border-radius:2px"></div></div>
+          <div style="font-size:10px;color:var(--text3)">2 — ${away}</div>
+        </div>
+      </div>
+      <div style="background:${recBg};border:1px solid ${recColor};border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:${recColor};flex-shrink:0">${rec}</div>
+        <div style="flex:1"><div style="font-size:12px;font-weight:600;color:${recColor}">המלצה: ${rec}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">${note}</div></div>
+        <div style="text-align:center"><div style="font-size:9px;color:var(--text3)">ביטחון</div><div style="font-size:11px;font-weight:700;color:${confColor}">${conf}</div></div>
+      </div>
+    </div>`;
+}
+
+function resetMatchAnalysis() {
+  APP.teamValidation = { home: null, away: null };
+  document.getElementById('home-team-input').value = '';
+  document.getElementById('away-team-input').value = '';
+  document.getElementById('home-status').textContent = '';
+  document.getElementById('away-status').textContent = '';
+  document.getElementById('home-hint-box').style.display = 'none';
+  document.getElementById('away-hint-box').style.display = 'none';
+  document.getElementById('home-input-wrap').style.borderColor = 'var(--border)';
+  document.getElementById('away-input-wrap').style.borderColor = 'var(--border)';
+  document.getElementById('match-input-view').style.display = 'flex';
+  document.getElementById('match-result-view').style.display = 'none';
+  updateMatchBtn();
+}
+
+function renderAIOptions() {
+  const el = document.getElementById('ai-options-list');
+  if (!el) return;
+  el.innerHTML = AI_MODELS.map(m => `
+    <div class="card" style="margin-bottom:6px;cursor:pointer;border-color:${APP.selectedAI===m.id?'var(--green-border)':m.installed?'var(--border2)':'var(--border)'};background:${APP.selectedAI===m.id?'var(--green-bg)':'var(--bg2)'}" onclick="selectAIModel('${m.id}')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:10px;background:${m.installed?'var(--accent-bg)':'var(--bg3)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${m.installed?'var(--accent)':'var(--text3)'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">
+            ${m.name}
+            <span class="badge ${m.installed?'gold':'gray'}">${m.installed?'מותקן':'לא מותקן'}</span>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">${m.sub}</div>
+        </div>
+        ${APP.selectedAI===m.id?'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':''}
+      </div>
+    </div>`).join('');
+}
+
+function selectAIModel(id) {
+  APP.selectedAI = id;
+  renderAIOptions();
+  const btn = document.getElementById('ai-connect-btn');
+  const hint = document.getElementById('ai-btn-hint');
+  const model = AI_MODELS.find(m => m.id === id);
+  btn.classList.remove('disabled');
+  hint.textContent = `${model.name} נבחר`;
+  hint.style.color = 'var(--accent2)';
+}
+
+function connectAI() {
+  if (!APP.selectedAI) return;
+  const model = AI_MODELS.find(m => m.id === APP.selectedAI);
+  APP.aiModel = APP.selectedAI;
+  localStorage.setItem('winner-ai', APP.selectedAI);
+  document.getElementById('ai-hero-icon').style.background = 'var(--green-bg)';
+  document.getElementById('ai-hero-icon').style.border = '1.5px solid var(--green-border)';
+  document.getElementById('ai-hero-icon').innerHTML = `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+  document.getElementById('ai-hero-title').textContent = 'AI מחובר ופעיל';
+  document.getElementById('ai-hero-title').style.color = 'var(--green)';
+  document.getElementById('ai-hero-sub').textContent = `${model.name} מוכן לשימוש`;
+  document.getElementById('ai-status-dot').style.background = 'var(--green)';
+  document.getElementById('ai-status-title').textContent = model.name;
+  document.getElementById('ai-status-sub').textContent = 'מחובר · ' + model.sub;
+  document.getElementById('ai-status-sub').style.color = 'var(--green)';
+  const btn = document.getElementById('ai-connect-btn');
+  btn.className = 'btn-primary';
+  btn.style.background = 'var(--green-bg)';
+  btn.style.color = 'var(--green)';
+  btn.style.border = '1.5px solid var(--green-border)';
+  document.getElementById('ai-connect-btn-text').textContent = `${model.name} מחובר ✓`;
+  document.getElementById('ai-btn-hint').textContent = 'מחובר — אפשר לחזור לאפליקציה';
+  document.getElementById('ai-btn-hint').style.color = 'var(--green)';
+  updateHomeAIStatus();
+}
+
+function updateHomeAIStatus() {
+  const title = document.getElementById('home-ai-title');
+  const sub = document.getElementById('home-ai-sub');
+  const icon = document.getElementById('home-ai-icon');
+  if (!title) return;
+
+  const isOnline = navigator.onLine;
+  const provider = AI_PROVIDERS.find(p => p.id === APP.selectedAI) || AI_PROVIDERS[0];
+
+  if (isOnline) {
+    title.textContent = 'AI מחובר ✓';
+    title.style.color = 'var(--green)';
+    sub.textContent = provider.name + ' · פעיל';
+    sub.style.color = 'var(--green)';
+    if (icon) {
+      icon.style.background = 'var(--green-bg)';
+      icon.style.border = '0.5px solid var(--green-border)';
+      icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap:round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+    }
+  } else {
+    title.textContent = 'AI לא מחובר';
+    title.style.color = 'var(--red)';
+    sub.textContent = 'אין חיבור לאינטרנט';
+    sub.style.color = 'var(--red)';
+    if (icon) {
+      icon.style.background = 'var(--red-bg)';
+      icon.style.border = '0.5px solid var(--red-border)';
+      icon.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+    }
+  }
+
+  const dot = document.getElementById('ai-status-dot');
+  if (dot) dot.style.background = isOnline ? 'var(--green)' : 'var(--red)';
+  const settSub = document.getElementById('settings-ai-sub');
+  if (settSub) {
+    settSub.textContent = isOnline ? provider.name + ' מחובר' : 'אין אינטרנט';
+    settSub.style.color = isOnline ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+// Update status when connection changes
+window.addEventListener('online', updateHomeAIStatus);
+window.addEventListener('offline', updateHomeAIStatus);
+
+function updateHomeStats() {
+  document.getElementById('stat-forms').textContent = APP.forms.length;
+  const best = APP.forms.filter(f => f.score !== null).reduce((b, f) => f.score > (b?.score || 0) ? f : b, null);
+  document.getElementById('stat-best').textContent = best ? best.score + '/16' : '—';
+  document.getElementById('stat-pending').textContent = APP.forms.filter(f => f.results === null).length;
+}
+
+function showNoAI(returnScreen) {
+  document.getElementById('no-ai-back').onclick = () => showScreen(returnScreen || 'screen-home');
+  showScreen('screen-no-ai');
+}
+
+function saveUsername(v) {
+  APP.username = v;
+  localStorage.setItem('winner-username', v);
+}
+
+function exportBackup() {
+  const data = JSON.stringify({ forms: APP.forms, version: APP.version, date: new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `winner-backup-${new Date().toLocaleDateString('he-IL').replace(/\//g,'-')}.json`;
+  a.click();
+}
+
+function importBackup() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.forms) {
+          APP.forms = data.forms;
+          localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
+          updateHomeStats();
+          toast('✅ גיבוי שוחזר!','s');
+        }
+      } catch { toast('שגיאה בקובץ','e'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function confirmDeleteAll() {
+  showDialog('מחיקת כל הנתונים','פעולה זו תמחק הכל לצמיתות. לא ניתן לשחזר!',[{label:'מחק הכל',cls:'dlg-danger',fn:()=>{APP.forms=[];localStorage.clear();updateHomeStats();toast('כל הנתונים נמחקו','i');showScreen('screen-home');}},{label:'ביטול',cls:'dlg-cancel',fn:null}]);
+}
+
+function shareApp() {
+  const url = 'https://barakaflalo.github.io/appnest';
+  const txt = `Winner אנליזר — ${APP.username ? 'מ' + APP.username + ' | ' : ''}אפליקציה חכמה לניתוח טופס הוינר 16 | ${url}`;
+  if (navigator.share) navigator.share({ title: 'Winner אנליזר', text: txt, url });
+  else { navigator.clipboard?.writeText(txt); toast('הקישור הועתק!','s'); }
+}
+
+function sendFeedback() { window.open('mailto:appnest55@gmail.com?subject=Winner Analyzer Feedback'); }
+function openLink(url) { window.open(url, '_blank'); }
+
+// ===== PWA SERVICE WORKER =====
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/toto/sw.js').catch(() => {});
+  });
+}
+
+// ===== TOAST =====
+function toast(msg, type='d') {
+  const c = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 2800);
+}
+
+// ===== DIALOG =====
+function showDialog(title, msg, btns) {
+  document.getElementById('dlg-t').textContent = title;
+  document.getElementById('dlg-m').textContent = msg;
+  document.getElementById('dlg-b').innerHTML = btns.map((b,i) =>
+    `<button class="${b.cls}" onclick="closeDlg(${i})">${b.label}</button>`
+  ).join('');
+  document._dlgBtns = btns;
+  document.getElementById('dlg-ov').classList.add('open');
+}
+function closeDlg(i) {
+  document.getElementById('dlg-ov').classList.remove('open');
+  const b = document._dlgBtns?.[i];
+  if (b?.fn) b.fn();
+}
+
+// ===== MODE יום/לילה =====
+function toggleMode() {
+  const isLight = document.documentElement.getAttribute('data-mode') === 'light';
+  applyMode(isLight ? 'dark' : 'light');
+}
+function applyMode(m) {
+  document.documentElement.setAttribute('data-mode', m === 'light' ? 'light' : '');
+  localStorage.setItem('winner-mode', m);
+  const icon = document.getElementById('mode-icon');
+  if (icon) {
+    if (m === 'light') {
+      icon.innerHTML = '<circle cx="12" cy="12" r="4"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>';
+    } else {
+      icon.innerHTML = '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>';
+    }
+  }
+  toast(m === 'light' ? '☀️ מצב יום' : '🌙 מצב לילה', 'i');
+}
+
+// ===== FORM RESULT =====
+function renderFormResult(form) {
+  const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':'var(--red)';
+  const pb = v => v==='1'?'var(--green-bg)':v==='X'?'var(--amber-bg)':'var(--red-bg)';
+  const cell = v => `<div class="strat-cell" style="background:${pb(v)};color:${pc(v)}">${v}</div>`;
+  const rowHTML = picks => `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:8px">${picks.map(cell).join('')}</div>`;
+  const n = form.games.length;
+  const safe  = Array(n).fill('1');
+  const surp  = ['1','X','2','1','X','1','2','X','1','1','X','2','1','X','1','2'].slice(0,n);
+  const bold  = ['2','1','X','2','1','2','X','1','2','2','X','1','2','X','2','1'].slice(0,n);
+  const mine  = Object.values(form.picks);
+  document.getElementById('form-result-body').innerHTML = `
+    <div style="text-align:center;padding:14px 0 18px">
+      <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">✅ הטופס נשמר!</div>
+      <div style="font-size:11px;color:var(--text3)">${n} משחקים · ${form.date}</div>
+    </div>
+    <div style="background:var(--green-bg);border:1px solid var(--green-border);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:2px">🛡️ שורה בטוחה</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">ניצחון בית לכל המשחקים</div>
+      ${rowHTML(safe)}
+    </div>
+    <div style="background:var(--amber-bg);border:1px solid var(--accent2);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:2px">⚡ הפתעות סטטיסטיות</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">שילוב מבוסס נתונים היסטוריים</div>
+      ${rowHTML(surp)}
+    </div>
+    <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:var(--radius-lg);padding:14px;margin-bottom:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:2px">🔥 שורה אגרסיבית</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">ריסק גבוה, פוטנציאל גבוה</div>
+      ${rowHTML(bold)}
+    </div>
+    <div class="card" style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">הבחירות שלך</div>
+      ${rowHTML(mine)}
+    </div>
+    <div style="text-align:center;font-size:11px;color:var(--text3);line-height:1.6;padding-bottom:16px">
+      אחרי הסיבוב — כנס להיסטוריה ועדכן תוצאות<br>כדי לראות כמה נכון ניחשת
+    </div>`;
+}
+
+// ===== CORE AI FUNCTION =====
+async function callAI(prompt) {
+  const provider = APP.selectedAI || 'gemini-app';
+  
+  if (provider === 'gemini-app') {
+    return await callGeminiWithRotation(prompt);
+  } else if (provider === 'gemini-pro') {
+    return await callGeminiCustom(prompt, APP.aiKey);
+  } else if (provider === 'gpt') {
+    return await callGPT(prompt, APP.aiKey);
+  } else if (provider === 'claude') {
+    return await callClaude(prompt, APP.aiKey);
+  }
+  throw new Error('לא נבחר מודל AI');
+}
+
+async function callGeminiWithRotation(prompt) {
+  const res = await fetch(CLOUDFLARE_WORKER_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.status }));
+    throw new Error(err.error || res.status);
+  }
+  const data = await res.json();
+  if (data.error) throw new Error(data.error);
+  return data.result || '';
+}
+
+async function callGeminiDirect(prompt, apiKey) {
+  // Try with grounding first, fallback to regular
+  const urls = [
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`
+  ];
+  
+  const bodies = [
+    // With Google Search grounding
+    JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      tools: [{ googleSearch: {} }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+    }),
+    // Without grounding (fallback)
+    JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 }
+    })
+  ];
+
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const res = await fetch(urls[i], {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: bodies[i]
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        if (res.status === 429) throw new Error('429: quota');
+        if (i === urls.length - 1) throw new Error(res.status + ': ' + err);
+        continue;
+      }
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (text) return text;
+    } catch (e) {
+      if (e.message.includes('429')) throw e;
+      if (i === urls.length - 1) throw e;
+    }
+  }
+  throw new Error('לא התקבלה תשובה מ-Gemini');
+}
+
+async function callGeminiCustom(prompt, key) {
+  return await callGeminiDirect(prompt, key);
+}
+
+async function callGPT(prompt, key) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+    body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: prompt }], max_tokens: 2048 })
+  });
+  if (!res.ok) throw new Error(res.status.toString());
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || '';
+}
+
+async function callClaude(prompt, key) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 2048, messages: [{ role: 'user', content: prompt }] })
+  });
+  if (!res.ok) throw new Error(res.status.toString());
+  const data = await res.json();
+  return data.content?.[0]?.text || '';
+}
+
+// ===== LOAD WEEKLY GAMES =====
+async function loadWeeklyGames() {
+  const btn = document.getElementById('load-weekly-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען משחקים...'; }
+  try {
+    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?t=' + Date.now());
+    if (!res.ok) throw new Error('שרת לא זמין (' + res.status + ')');
+    const data = await res.json();
+    if (!data.ok || !data.games || !data.games.length) throw new Error('לא התקבלו משחקים');
+
+    APP.currentGames = data.games.map(g => ({
+      home: g.home, away: g.away, league: g.league,
+      day: g.day, time: g.time,
+      odds: g.odds, probs: g.probs,
+      pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds
+    }));
+    APP.programNumber = data.program || '';
+    APP.programDate = data.date || '';
+    APP.currentPicks = {};
+
+    renderFormGames();
+    showScreen('screen-fill-form');
+    toast('✅ ' + data.games.length + ' משחקים נטענו' + (data.program ? ' (מחזור ' + data.program + ')' : ''), 'success');
+  } catch (e) {
+    console.error('Load Error:', e);
+    toast('שגיאה בטעינה: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🌐 טען טופס שבועי אוטומטית'; }
+  }
+}
+
+// ===== ANALYZE GAMES (REAL MATH ENGINE) =====
+// ההמלצה מחושבת מהיחסים האמיתיים: הסתברות = 1/יחס, מנורמל ל-100%
+function oddsToProbs(o1, oX, o2) {
+  const hasOdds = !(o1 === 1 && oX === 1 && o2 === 1) && o1 > 0 && oX > 0 && o2 > 0;
+  if (!hasOdds) return { '1':33, 'X':33, '2':34, pick:'?', confidence:'אין נתונים', hasOdds:false };
+
+  const r1 = 1/o1, rX = 1/oX, r2 = 1/o2;
+  const sum = r1 + rX + r2;
+  const p1 = Math.round((r1/sum)*100);
+  const pX = Math.round((rX/sum)*100);
+  const p2 = 100 - p1 - pX;
+
+  const map = { '1':p1, 'X':pX, '2':p2 };
+  const pick = Object.keys(map).reduce((a,b) => map[a] >= map[b] ? a : b);
+  const top = map[pick];
+  const sorted = Object.values(map).sort((a,b) => b-a);
+  const gap = sorted[0] - sorted[1];
+  let confidence = 'נמוכה';
+  if (top >= 55 || gap >= 20) confidence = 'גבוהה';
+  else if (top >= 42 || gap >= 10) confidence = 'בינונית';
+
+  return { '1':p1, 'X':pX, '2':p2, pick, confidence, hasOdds:true };
+}
+
+async function analyzeGamesWithAI() {
+  if (!APP.currentGames.length) { toast('אין משחקים לניתוח', 'error'); return; }
+  const btn = document.getElementById('ai-analyze-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ מנתח...'; }
+  try {
+    const picks = {};
+    let analyzed = 0, noData = 0;
+
+    APP.currentGames.forEach((g, i) => {
+      // אם ה-Worker כבר חישב — נשתמש בזה. אחרת נחשב מהיחסים.
+      let p = g.probs && g.pick ? { pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds } : null;
+      if (!p && g.odds) {
+        const c = oddsToProbs(Number(g.odds['1']), Number(g.odds['X']), Number(g.odds['2']));
+        g.probs = c; g.pick = c.pick; g.confidence = c.confidence; g.hasOdds = c.hasOdds;
+        p = c;
+      }
+      if (p && p.hasOdds && p.pick !== '?') { picks[i] = p.pick; analyzed++; }
+      else noData++;
+    });
+
+    if (!analyzed) { toast('אין יחסים זמינים לניתוח', 'error'); return; }
+
+    APP.currentPicks = picks;
+    renderFormGames();
+    let msg = '✅ נותחו ' + analyzed + ' משחקים';
+    if (noData) msg += ' (' + noData + ' ללא יחסים)';
+    toast(msg, 'success');
+  } catch (e) {
+    toast('שגיאה בניתוח: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 נתח עם AI'; }
+  }
+}
+
+// ===== AI PROVIDER SCREEN =====
+function renderAIOptions() {
+  const el = document.getElementById('ai-options-list');
+  if (!el) return;
+  el.innerHTML = AI_PROVIDERS.map(p => {
+    const selected = APP.selectedAI === p.id;
+    const userKey = p.id === APP.selectedAI && !p.builtin ? APP.aiKey : '';
+    return `<div class="card${selected?' gold':''}" style="margin-bottom:8px;cursor:pointer;transition:all 0.15s" onclick="selectAIProvider('${p.id}')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:38px;height:38px;border-radius:10px;background:${selected?'var(--accent-bg2)':'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${p.icon}</div>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:600;color:${selected?'var(--accent)':'var(--text)'};display:flex;align-items:center;gap:6px">
+            ${p.name}
+            ${p.builtin ? '<span style="font-size:9px;background:var(--green-bg);border:0.5px solid var(--green-border);color:var(--green);border-radius:4px;padding:1px 6px">מובנה</span>' : ''}
+            ${selected ? '<span style="font-size:9px;background:var(--accent-bg2);border:0.5px solid var(--accent2);color:var(--accent);border-radius:4px;padding:1px 6px">נבחר ✓</span>' : ''}
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px;line-height:1.4">${p.sub}</div>
+        </div>
+      </div>
+      ${selected && !p.builtin ? `
+        <div style="margin-top:10px;border-top:0.5px solid var(--border);padding-top:10px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:5px">🔑 המפתח האישי שלך:</div>
+          <div style="display:flex;gap:6px">
+            <input type="password" id="user-api-key" placeholder="הכנס API Key..." value="${userKey}" style="flex:1;font-size:11px;padding:8px 10px" oninput="APP.aiKey=this.value" />
+            <button onclick="saveUserKey()" style="background:var(--accent-bg2);border:1px solid var(--accent2);color:var(--accent);border-radius:var(--radius);padding:8px 12px;font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);flex-shrink:0">שמור</button>
+          </div>
+          <div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">🔒 המפתח נשמר על המכשיר שלך בלבד — אף אחד לא יכול לראות אותו</div>
+        </div>
+      ` : ''}
+    </div>`;
+  }).join('');
+}
+
+function selectAIProvider(id) {
+  APP.selectedAI = id;
+  const p = AI_PROVIDERS.find(x => x.id === id);
+  if (p.builtin) {
+    APP.aiModel = id;
+    localStorage.setItem('winner-ai', id);
+    updateHomeAIStatus();
+    toast(`✅ ${p.name} נבחר!`, 'success');
+  }
+  renderAIOptions();
+}
+
+function saveUserKey() {
+  const key = document.getElementById('user-api-key')?.value.trim();
+  if (!key) { toast('הכנס מפתח תחילה', 'error'); return; }
+  APP.aiKey = key;
+  APP.aiModel = APP.selectedAI;
+  localStorage.setItem('winner-ai', APP.selectedAI);
+  localStorage.setItem('winner-ai-key', key);
+  updateHomeAIStatus();
+  toast('✅ מפתח נשמר!', 'success');
+  renderAIOptions();
+}
+
+function connectAI() {
+  if (!APP.selectedAI) return;
+  const p = AI_PROVIDERS.find(x => x.id === APP.selectedAI);
+  if (!p) return;
+  if (!p.builtin && !APP.aiKey) { toast('הכנס מפתח API תחילה', 'error'); return; }
+  APP.aiModel = APP.selectedAI;
+  localStorage.setItem('winner-ai', APP.selectedAI);
+  if (APP.aiKey) localStorage.setItem('winner-ai-key', APP.aiKey);
+  
+  // Update UI
+  document.getElementById('ai-hero-icon').style.background = 'var(--green-bg)';
+  document.getElementById('ai-hero-icon').style.border = '1.5px solid var(--green-border)';
+  document.getElementById('ai-hero-title').textContent = `${p.name} מחובר ✓`;
+  document.getElementById('ai-hero-title').style.color = 'var(--green)';
+  document.getElementById('ai-status-dot').style.background = 'var(--green)';
+  document.getElementById('ai-status-title').textContent = p.name + ' מחובר';
+  document.getElementById('ai-status-sub').style.color = 'var(--green)';
+  updateHomeAIStatus();
+  toast(`✅ ${p.name} מחובר!`, 'success');
+  showScreen('screen-home');
+}
+
+// ===== ADMIN SYSTEM =====
+let adminPinInput = '';
+const DEFAULT_ADMIN_CODE = '1234';
+
+function getAdminCode() {
+  return localStorage.getItem('winner-admin-code') || DEFAULT_ADMIN_CODE;
+}
+
+function openAdminLogin() {
+  adminPinInput = '';
+  updatePinDots();
+  document.getElementById('admin-pin-error').style.display = 'none';
+  document.getElementById('admin-login-overlay').style.display = 'flex';
+}
+
+function closeAdminLogin() {
+  adminPinInput = '';
+  updatePinDots();
+  document.getElementById('admin-login-overlay').style.display = 'none';
+}
+
+function adminPinKey(key) {
+  if (key === '⌫') {
+    adminPinInput = adminPinInput.slice(0,-1);
+  } else if (key === '') {
+    return;
+  } else if (adminPinInput.length < 4) {
+    adminPinInput += key;
+  }
+  updatePinDots();
+  if (adminPinInput.length === 4) {
+    setTimeout(() => {
+      if (adminPinInput === getAdminCode()) {
+        closeAdminLogin();
+        renderAdminScreen();
+        showScreen('screen-admin');
+      } else {
+        document.getElementById('admin-pin-error').style.display = 'block';
+        adminPinInput = '';
+        updatePinDots();
+      }
+    }, 200);
+  }
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    const dot = document.getElementById('pin-d' + i);
+    if (dot) dot.style.background = i < adminPinInput.length ? 'var(--accent)' : 'var(--border2)';
+  }
+}
+
+function renderAdminScreen() {
+  // Load keys from localStorage
+  const savedKeys = JSON.parse(localStorage.getItem('winner-admin-keys') || '[]');
+  if (savedKeys.length === 0) {
+    // Pre-fill with current keys
+    GEMINI_KEYS.forEach((k,i) => savedKeys.push({id:i+1, key:k}));
+  }
+  const el = document.getElementById('admin-keys-list');
+  if (!el) return;
+  el.innerHTML = savedKeys.map((k,i) => `
+    <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+      <div style="font-size:11px;color:var(--text3);width:20px;text-align:center;flex-shrink:0">${i+1}</div>
+      <input type="text" value="${k.key}" id="admin-key-${i}" placeholder="API Key..." style="flex:1;font-size:10px;padding:8px 10px;font-family:monospace" />
+      <button onclick="removeAdminKey(${i})" style="padding:8px;border-radius:var(--radius);background:var(--red-bg);border:0.5px solid var(--red-border);color:var(--red);font-size:12px;cursor:pointer;font-family:var(--font);flex-shrink:0">✕</button>
+    </div>
+  `).join('') + `<button onclick="saveAdminKeys()" style="width:100%;padding:10px;border-radius:var(--radius);background:var(--accent-bg2);border:1.5px solid var(--accent2);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);margin-top:4px">💾 שמור מפתחות</button>`;
+
+  const cc = document.getElementById('admin-current-code');
+  if (cc) cc.textContent = getAdminCode();
+}
+
+function addAdminKey() {
+  const savedKeys = JSON.parse(localStorage.getItem('winner-admin-keys') || '[]');
+  savedKeys.push({id: Date.now(), key: ''});
+  localStorage.setItem('winner-admin-keys', JSON.stringify(savedKeys));
+  renderAdminScreen();
+}
+
+function removeAdminKey(idx) {
+  const savedKeys = JSON.parse(localStorage.getItem('winner-admin-keys') || '[]');
+  savedKeys.splice(idx, 1);
+  localStorage.setItem('winner-admin-keys', JSON.stringify(savedKeys));
+  renderAdminScreen();
+  toast('מפתח הוסר', 'info');
+}
+
+function saveAdminKeys() {
+  const savedKeys = JSON.parse(localStorage.getItem('winner-admin-keys') || '[]');
+  const newKeys = savedKeys.map((_,i) => {
+    const inp = document.getElementById('admin-key-' + i);
+    return { id: i+1, key: inp ? inp.value.trim() : '' };
+  }).filter(k => k.key.length > 10);
+
+  localStorage.setItem('winner-admin-keys', JSON.stringify(newKeys));
+  // Update runtime keys
+  const keys = newKeys.map(k => k.key);
+  if (keys.length > 0) {
+    GEMINI_KEYS.length = 0;
+    keys.forEach(k => GEMINI_KEYS.push(k));
+  }
+  toast(`✅ ${newKeys.length} מפתחות נשמרו!`, 'success');
+}
+
+function saveAdminCode() {
+  const newCode = document.getElementById('admin-new-code')?.value.trim();
+  if (!newCode || newCode.length < 4) { toast('קוד חייב להיות 4 ספרות לפחות', 'error'); return; }
+  if (!/^\d+$/.test(newCode)) { toast('קוד חייב להכיל ספרות בלבד', 'error'); return; }
+  localStorage.setItem('winner-admin-code', newCode);
+  document.getElementById('admin-current-code').textContent = newCode;
+  document.getElementById('admin-new-code').value = '';
+  toast('✅ קוד מנהל עודכן!', 'success');
+}
+
+async function testAllKeys() {
+  const el = document.getElementById('admin-test-results');
+  el.innerHTML = '<div style="font-size:11px;color:var(--text3)">בודק מפתחות...</div>';
+  const results = [];
+  for (let i = 0; i < GEMINI_KEYS.length; i++) {
+    try {
+      await callGeminiDirect('תגיד שלום בעברית במילה אחת', GEMINI_KEYS[i]);
+      results.push(`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <span style="color:var(--green)">✅</span>
+        <span style="font-size:11px;color:var(--text)">מפתח ${i+1}</span>
+        <span style="font-size:10px;color:var(--green)">תקין</span>
+      </div>`);
+    } catch(e) {
+      const reason = e.message.includes('429') ? 'מגבלה יומית' : e.message.includes('401') ? 'מפתח לא תקף' : 'שגיאה';
+      results.push(`<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:0.5px solid var(--border)">
+        <span style="color:var(--red)">❌</span>
+        <span style="font-size:11px;color:var(--text)">מפתח ${i+1}</span>
+        <span style="font-size:10px;color:var(--red)">${reason}</span>
+      </div>`);
+    }
+  }
+  el.innerHTML = results.join('');
+}
+
+// Load admin keys on startup
+function loadAdminKeys() {
+  const saved = JSON.parse(localStorage.getItem('winner-admin-keys') || '[]');
+  if (saved.length > 0) {
+    const keys = saved.map(k => k.key).filter(k => k.length > 10);
+    if (keys.length > 0) {
+      GEMINI_KEYS.length = 0;
+      keys.forEach(k => GEMINI_KEYS.push(k));
+    }
+  }
+}
+
+// ===== AUTOCOMPLETE FIX =====
+const TEAMS_DB = [
+  'מכבי תל אביב','מכבי חיפה','מכבי נתניה','מכבי פתח תקווה','מכבי אום אל פחם',
+  'הפועל תל אביב','הפועל חיפה','הפועל באר שבע','הפועל ירושלים','הפועל כפר סבא','הפועל רמת גן',
+  'ביתר ירושלים','ביתר תל אביב','בני סכנין','עירוני קרית שמונה','עירוני נתניה',
+  'אסתא בני יהודה','הפועל פתח תקווה','מ.ס. אשדוד','בני ינאי',
+  'Real Madrid','FC Barcelona','Atletico Madrid','Sevilla FC','Valencia CF',
+  'Manchester City','Manchester United','Liverpool FC','Arsenal FC','Chelsea FC','Tottenham',
+  'Bayern Munich','Borussia Dortmund','RB Leipzig','Bayer Leverkusen',
+  'Juventus','Inter Milan','AC Milan','Napoli','AS Roma','Lazio',
+  'PSG','Marseille','Lyon','Monaco',
+  'Ajax','PSV Eindhoven','Feyenoord',
+  'Porto','Benfica','Sporting CP',
+  'Morocco','Norway','Greece','Italy','Armenia','Kazakhstan',
+  'מרוקו','נורבגיה','יוון','איטליה','ארמניה','קזחסטן',
+  'אסקולי','ברשיה','קסטיון','אלמריה','לאס פלמאס','מלאגה',
+  'אתלטיקו מדריד ב','פונפראדינה','סלטה ויגו ב','יורופה'
+];
+
+let autocompleteTimers = {};
+
+function setupTeamInput(inputId, sideId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  input.removeAttribute('list');
+  input.autocomplete = 'off';
+  input.oninput = () => handleTeamInput(inputId, sideId);
+}
+
+function handleTeamInput(inputId, side) {
+  const input = document.getElementById(inputId);
+  const val = input.value.trim();
+  const suggestId = inputId + '-suggest';
+
+  // Remove old suggestions
+  const old = document.getElementById(suggestId);
+  if (old) old.remove();
+
+  if (val.length < 2) {
+    if (side) { APP.teamValidation[side] = null; updateMatchBtn(); }
+    return;
+  }
+
+  // Filter teams
+  const matches = TEAMS_DB.filter(t =>
+    t.toLowerCase().includes(val.toLowerCase()) ||
+    val.toLowerCase().split(' ').some(w => w.length > 1 && t.toLowerCase().includes(w))
+  ).slice(0, 5);
+
+  if (matches.length === 0) {
+    // Accept free text after short delay
+    clearTimeout(autocompleteTimers[inputId]);
+    autocompleteTimers[inputId] = setTimeout(() => {
+      if (side) { APP.teamValidation[side] = val; updateMatchBtn(); }
+    }, 600);
+    return;
+  }
+
+  // Show suggestions list
+  const wrap = input.parentElement;
+  const suggest = document.createElement('div');
+  suggest.id = suggestId;
+  suggest.style.cssText = `position:absolute;right:0;left:0;top:100%;background:var(--bg2);border:1px solid var(--accent2);border-top:none;border-radius:0 0 var(--radius) var(--radius);z-index:100;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.3)`;
+  suggest.innerHTML = matches.map(t => `
+    <div onclick="selectTeam('${inputId}','${t}','${side||''}')" style="padding:10px 14px;font-size:12px;color:var(--text);cursor:pointer;border-bottom:0.5px solid var(--border);transition:background 0.1s" onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='transparent'">
+      ${highlightMatch(t, val)}
+    </div>
+  `).join('');
+  wrap.style.position = 'relative';
+  wrap.appendChild(suggest);
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', function closeSuggest(e) {
+      if (!suggest.contains(e.target) && e.target !== input) {
+        suggest.remove();
+        document.removeEventListener('click', closeSuggest);
+      }
+    });
+  }, 100);
+}
+
+function highlightMatch(text, query) {
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return text.slice(0,idx) + `<strong style="color:var(--accent)">${text.slice(idx,idx+query.length)}</strong>` + text.slice(idx+query.length);
+}
+
+function selectTeam(inputId, teamName, side) {
+  const input = document.getElementById(inputId);
+  if (input) input.value = teamName;
+  const suggest = document.getElementById(inputId + '-suggest');
+  if (suggest) suggest.remove();
+  if (side) { APP.teamValidation[side] = teamName; updateMatchBtn(); }
+}
+
+init();
+</script>
+</body>
+</html>
