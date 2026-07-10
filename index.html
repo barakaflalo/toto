@@ -440,7 +440,7 @@ textarea{resize:none}
     <div style="display:flex;gap:5px;margin-bottom:10px">
       <button onclick="applyStrategy('safe')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--green-border);background:transparent;font-size:10px;font-weight:600;color:var(--green);cursor:pointer;font-family:var(--font)">🛡️ בטוח</button>
       <button onclick="applyStrategy('surprise')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--accent2);background:transparent;font-size:10px;font-weight:600;color:var(--accent);cursor:pointer;font-family:var(--font)">⚡ הפתעות</button>
-      <button onclick="applyStrategy('bold')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--red-border);background:transparent;font-size:10px;font-weight:600;color:var(--red);cursor:pointer;font-family:var(--font)">🔥 אגרסיבי</button>
+      <button onclick="applyStrategy('bold')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--red-border);background:transparent;font-size:10px;font-weight:600;color:var(--red);cursor:pointer;font-family:var(--font)">⚖️ מאוזן</button>
       <button onclick="clearAllPicks()" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--font)">✕ נקה</button>
     </div>
     <div id="form-games-list" style="display:flex;flex-direction:column;gap:5px"></div>
@@ -1113,7 +1113,10 @@ function renderFormGames() {
     const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
     const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` : '';
     // תג המלצה קטן
-    const recBadge = rec ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>` : '';
+    const noOdds = g.odds && !g.hasOdds;
+    const recBadge = rec
+      ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>`
+      : (noOdds ? `<span style="font-size:9px;color:var(--text3);white-space:nowrap">ליין טרם נפתח — מלא ידנית</span>` : '');
     return `<div style="background:var(--bg2);border:0.5px solid ${p?'var(--accent2)':'var(--border)'};border-radius:var(--radius);padding:8px 10px;display:flex;align-items:center;gap:8px" id="game-row-${i}">
       <div style="font-size:10px;color:var(--text3);width:14px;flex-shrink:0;text-align:center">${i+1}</div>
       <div style="flex:1;min-width:0">
@@ -1164,13 +1167,45 @@ function updateFormBtn() {
   }
 }
 
+// ===== מנוע האסטרטגיות =====
+// בהימורים: יחס נמוך = פייבוריט (סביר יותר). יחס גבוה = אנדרדוג.
+const CLOSE_GAP = 0.30;        // פער עד 30% בין שני היחסים הנמוכים = "משחק צמוד"
+const MIN_VALUE_ODDS = 2.20;   // ההפתעה חייבת להחזיר לפחות זה כדי להצדיק סיכון
+
+function pickByStrategy(odds, type) {
+  const o1 = Number(odds['1']), oX = Number(odds['X']), o2 = Number(odds['2']);
+  if (!(o1 > 0 && oX > 0 && o2 > 0) || (o1 === 1 && oX === 1 && o2 === 1)) return null;
+
+  const map = { '1': o1, 'X': oX, '2': o2 };
+  // ממיין מהיחס הנמוך (פייבוריט) לגבוה (אנדרדוג)
+  const sorted = Object.keys(map).sort((a, b) => map[a] - map[b]);
+  const fav = sorted[0], second = sorted[1];
+  const gap = (map[second] - map[fav]) / map[fav];
+
+  if (type === 'safe') return fav;
+
+  if (type === 'surprise') {
+    // הפתעה סבירה רק כשהיחסים קרובים; אחרת אין על מה להמר
+    return gap <= CLOSE_GAP ? second : fav;
+  }
+
+  // 'bold' = מאוזן: לוקח סיכון רק אם המשחק צמוד וגם ההפתעה משתלמת
+  if (gap <= CLOSE_GAP && map[second] >= MIN_VALUE_ODDS) return second;
+  return fav;
+}
+
 function applyStrategy(type) {
+  let filled = 0, skipped = 0;
   APP.currentGames.forEach((g, i) => {
-    if (type === 'safe') APP.currentPicks[i] = '1';
-    else if (type === 'surprise') APP.currentPicks[i] = i % 3 === 0 ? 'X' : i % 3 === 1 ? '2' : '1';
-    else APP.currentPicks[i] = i % 2 === 0 ? '2' : i % 3 === 0 ? 'X' : '1';
+    if (!g.odds) { skipped++; return; }
+    const choice = pickByStrategy(g.odds, type);
+    if (!choice) { skipped++; return; }   // ליין טרם נפתח
+    APP.currentPicks[i] = choice;
+    filled++;
   });
   renderFormGames();
+  if (skipped > 0) toast('מולאו ' + filled + ' משחקים · ' + skipped + ' ללא ליין (מלא ידנית)', 'info');
+  else toast('מולאו כל ' + filled + ' המשחקים', 'success');
 }
 
 function clearAllPicks() { APP.currentPicks = {}; renderFormGames(); }
@@ -1433,7 +1468,7 @@ async function doMatchAnalysis() {
       hasData = true;
       note = 'מבוסס על יחסי הליין של המשחק בטופס הנוכחי';
     } else {
-      note = 'המשחק לא נמצא בטופס הנוכחי — לא ניתן לחשב תחזית מדויקת';
+      note = 'המשחק לא נמצא במשחקי הווינר של השבוע — ודא שהשמות נכונים';
     }
   } catch (e) {
     note = 'שגיאה בחיבור לשרת';
@@ -1444,7 +1479,7 @@ async function doMatchAnalysis() {
       '<div style="font-size:32px;margin-bottom:8px">🔍</div>' +
       '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">' + home + ' נגד ' + away + '</div>' +
       '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + note + '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-top:12px">טיפ: ניתוח ראש בראש עובד על משחקים שנמצאים בטופס הווינר הנוכחי. טען קודם את הטופס השבועי.</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:12px">טיפ: הניתוח מכסה את כל משחקי הווינר של השבוע (מאות משחקים). ודא שהשמות נכתבו נכון, או שהמשחק כבר הסתיים/עדיין לא נפתח להימור.</div>' +
       '</div>';
     return;
   }
