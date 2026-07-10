@@ -592,7 +592,7 @@ textarea{resize:none}
       </div>
     </div>
 
-    <div class="section-lbl">עיצוב ושפה</div>
+    <div class="section-lbl">עיצוב</div>
     <div class="row-item" style="cursor:default">
       <div class="row-icon" style="background:var(--bg3)">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
@@ -607,7 +607,7 @@ textarea{resize:none}
         </div>
       </div>
     </div>
-    <div class="row-item" onclick="showLangPicker()">
+    <div class="row-item" onclick="showLangPicker()" style="display:none">
       <div class="row-icon" style="background:var(--bg3)">
         <svg viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
       </div>
@@ -920,7 +920,7 @@ let guideStep = 0;
 
 function init() {
   applyTheme(APP.theme);
-  applyLang(APP.lang);
+  applyLang('he');
   loadAdminKeys(); // Load saved admin keys
   const savedMode = localStorage.getItem('winner-mode') || 'dark';
   if (savedMode === 'light') {
@@ -1189,8 +1189,8 @@ function pickByStrategy(odds, type) {
     return gap <= CLOSE_GAP ? second : fav;
   }
 
-  // 'bold' = מאוזן: לוקח סיכון רק אם המשחק צמוד וגם ההפתעה משתלמת
-  if (gap <= CLOSE_GAP && map[second] >= MIN_VALUE_ODDS) return second;
+  // 'bold' = מאוזן (ציד תיקו): במשחק צמוד נוטים לתיקו → בוחר X
+  if (gap <= CLOSE_GAP) return 'X';
   return fav;
 }
 
