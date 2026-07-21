@@ -2026,10 +2026,11 @@ async function loadWeeklyGames() {
     if (!data.ok || !data.games || !data.games.length) throw new Error('לא התקבלו משחקים');
 
     APP.currentGames = data.games.map(g => ({
-      home: g.home, away: g.away, league: g.league,
-      day: g.day, time: g.time,
+      home: g.home, away: g.away, league: g.league || '',
+      status: g.status || '',
       odds: g.odds, probs: g.probs,
-      pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds
+      pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
+      result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway
     }));
     APP.programNumber = data.program || '';
     APP.programDate = data.date || '';
@@ -2037,7 +2038,10 @@ async function loadWeeklyGames() {
 
     renderFormGames();
     showScreen('screen-fill-form');
-    toast('✅ ' + data.games.length + ' משחקים נטענו' + (data.program ? ' (מחזור ' + data.program + ')' : ''), 'success');
+    const oddsN = data.games.filter(g => g.hasOdds).length;
+    let msg = '✅ ' + data.games.length + ' משחקים נטענו' + (data.program ? ' (מחזור ' + data.program + ')' : '');
+    if (oddsN === 0) msg += ' — יחסים טרם נפתחו, מלא ידנית';
+    toast(msg, oddsN === 0 ? 'info' : 'success');
   } catch (e) {
     console.error('Load Error:', e);
     toast('שגיאה בטעינה: ' + e.message, 'error');
