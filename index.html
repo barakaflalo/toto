@@ -1562,55 +1562,77 @@ function updateMatchBtn() {
 async function doMatchAnalysis() {
   const tv = APP.teamValidation;
   if (!tv.home || !tv.away) return;
-  const home = tv.home;
-  const away = tv.away;
+  const home = tv.home, away = tv.away;
   const rv = document.getElementById('match-result-view');
   const iv = document.getElementById('match-input-view');
   const content = document.getElementById('match-result-content');
   iv.style.display = 'none';
   rv.style.display = 'flex';
-  content.innerHTML = '<div class="card" style="text-align:center;padding:30px"><div style="font-size:14px;color:var(--text2)">⏳ מחשב תחזית מהיחסים...</div></div>';
+  content.innerHTML = '<div class="card" style="text-align:center;padding:30px"><div style="font-size:14px;color:var(--text2)">⏳ מחפש נתונים...</div></div>';
 
-  let p1, px, p2, rec, conf = 'בינונית', hasData = false, note = '';
+  let match = null, reversed = false, err = '';
   try {
     const q = encodeURIComponent(home) + '|' + encodeURIComponent(away);
     const res = await fetch(CLOUDFLARE_WORKER_URL + '/?h2h=' + q + '&t=' + Date.now());
     const data = await res.json();
-    if (data.ok && data.found && data.match && data.match.probs && data.match.hasOdds) {
-      const m = data.match;
-      // אם המשחק הפוך בטופס (הבית/חוץ מוחלפים) — נהפוך את ההסתברויות
-      if (m.reversed) {
-        p1 = m.probs['2']; px = m.probs['X']; p2 = m.probs['1'];
-        rec = m.pick === '1' ? '2' : m.pick === '2' ? '1' : 'X';
-      } else {
-        p1 = m.probs['1']; px = m.probs['X']; p2 = m.probs['2'];
-        rec = m.pick;
-      }
-      conf = m.confidence || 'בינונית';
-      hasData = true;
-      note = 'מבוסס על יחסי הליין של המשחק בטופס הנוכחי';
-    } else {
-      note = 'המשחק לא נמצא במשחקי הווינר של השבוע — ודא שהשמות נכונים';
-    }
-  } catch (e) {
-    note = 'שגיאה בחיבור לשרת';
-  }
+    if (data.ok && data.found && data.match) { match = data.match; reversed = !!match.reversed; }
+    else err = 'המשחק לא נמצא במשחקי הווינר של השבוע';
+  } catch (e) { err = 'שגיאה בחיבור לשרת'; }
 
-  if (!hasData) {
+  // לא נמצא בכלל
+  if (!match) {
     content.innerHTML = '<div class="card" style="text-align:center;padding:24px">' +
       '<div style="font-size:32px;margin-bottom:8px">🔍</div>' +
       '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">' + home + ' נגד ' + away + '</div>' +
-      '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + note + '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-top:12px">טיפ: הניתוח מכסה את כל משחקי הווינר של השבוע (מאות משחקים). ודא שהשמות נכתבו נכון, או שהמשחק כבר הסתיים/עדיין לא נפתח להימור.</div>' +
+      '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + err + '</div>' +
+      '<div style="font-size:11px;color:var(--text3);margin-top:12px">ודא שהשמות נכתבו נכון. הניתוח מכסה את משחקי הווינר של השבוע.</div>' +
       '</div>';
     return;
   }
 
-  const recColor = rec==='1'?'var(--green)':rec==='X'?'var(--amber)':'var(--red)';
-  const recBg = rec==='1'?'var(--green-bg)':rec==='X'?'var(--amber-bg)':'var(--red-bg)';
-  const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
-  content.innerHTML = `
-    <div class="card" style="margin-bottom:10px">
+  // עוזרים
+  const norm = v => reversed ? (v==='1'?'2':v==='2'?'1':v) : v;
+  let html = '';
+
+  // כותרת המשחק
+  html += `<div class="card" style="margin-bottom:10px;text-align:center">
+    <div style="font-size:14px;font-weight:700;color:var(--text)">${home} — ${away}</div>
+    ${match.league ? `<div style="font-size:10px;color:var(--text3);margin-top:3px">${match.league}</div>` : ''}
+    ${match.status ? `<div style="font-size:10px;color:var(--accent);margin-top:2px">${match.status}</div>` : ''}
+  </div>`;
+
+  // 1) יש תוצאה סופית → מציגים אותה
+  if (match.result) {
+    const rres = norm(match.result);
+    const sH = reversed ? match.scoreAway : match.scoreHome;
+    const sA = reversed ? match.scoreHome : match.scoreAway;
+    const winC = rres==='1'?'var(--green)':rres==='2'?'var(--red)':'var(--amber)';
+    const winTxt = rres==='1'?('ניצחון '+home):rres==='2'?('ניצחון '+away):'תיקו';
+    html += `<div class="card" style="border-color:${winC}">
+      <div style="text-align:center;padding:6px 0">
+        ${(sH!=null&&sA!=null)?`<div style="font-size:30px;font-weight:800;color:var(--text)">${sH} - ${sA}</div>`:''}
+        <div style="display:inline-flex;align-items:center;gap:8px;margin-top:8px;background:${winC};color:#fff;border-radius:8px;padding:6px 14px">
+          <span style="font-size:18px;font-weight:800">${rres}</span>
+          <span style="font-size:12px;font-weight:600">${winTxt}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:10px">תוצאה סופית מהמקור</div>
+      </div>
+    </div>`;
+    content.innerHTML = html;
+    return;
+  }
+
+  // 2) יש יחסים → ניתוח הסתברות מלא
+  if (match.probs && match.hasOdds) {
+    const p1 = reversed ? match.probs['2'] : match.probs['1'];
+    const px = match.probs['X'];
+    const p2 = reversed ? match.probs['1'] : match.probs['2'];
+    const rec = norm(match.pick);
+    const conf = match.confidence || 'בינונית';
+    const recColor = rec==='1'?'var(--green)':rec==='X'?'var(--amber)':'var(--red)';
+    const recBg = rec==='1'?'var(--green-bg)':rec==='X'?'var(--amber-bg)':'var(--red-bg)';
+    const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
+    html += `<div class="card">
       <div style="font-size:10px;color:var(--text3);margin-bottom:10px">ניתוח מבוסס יחסי ליין אמיתיים</div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <div style="flex:1;text-align:center;background:var(--green-bg);border-radius:8px;padding:10px 4px">
@@ -1631,10 +1653,21 @@ async function doMatchAnalysis() {
       </div>
       <div style="background:${recBg};border:1px solid ${recColor};border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:10px">
         <div style="width:36px;height:36px;border-radius:9px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:${recColor};flex-shrink:0">${rec}</div>
-        <div style="flex:1"><div style="font-size:12px;font-weight:600;color:${recColor}">המלצה: ${rec}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">${note}</div></div>
+        <div style="flex:1"><div style="font-size:12px;font-weight:600;color:${recColor}">המלצה: ${rec}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">מבוסס על יחסי הליין</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:var(--text3)">ביטחון</div><div style="font-size:11px;font-weight:700;color:${confColor}">${conf}</div></div>
       </div>
     </div>`;
+    content.innerHTML = html;
+    return;
+  }
+
+  // 3) נמצא אבל אין עדיין יחסים/תוצאה (משחק עתידי)
+  html += `<div class="card" style="text-align:center;padding:20px">
+    <div style="font-size:28px;margin-bottom:8px">📅</div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">המשחק בטופס — טרם נפתח להימור</div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.5">היחסים והתחזית יופיעו כשהליין ייפתח (בדרך כלל קרוב יותר למועד המשחק). בדוק שוב מאוחר יותר.</div>
+  </div>`;
+  content.innerHTML = html;
 }
 
 function resetMatchAnalysis() {
