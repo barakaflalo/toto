@@ -419,7 +419,17 @@ textarea{resize:none}
     <div style="width:34px"></div>
   </div>
   <div id="match-input-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-    <div class="scroll-body" id="match-list"></div>
+    <div style="padding:10px 14px 4px;flex-shrink:0">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button id="mtab-line" onclick="setMatchSource('line')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">כל המשחקים</button>
+        <button id="mtab-form" onclick="setMatchSource('form')" style="flex:1;padding:9px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg2);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">טופס השבוע (16)</button>
+      </div>
+      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);padding:9px 12px;display:flex;align-items:center;gap:8px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="match-search" placeholder="חפש קבוצה..." autocomplete="off" oninput="renderMatchList()" style="border:none;background:transparent;padding:0;flex:1;font-family:var(--font)" />
+      </div>
+    </div>
+    <div class="scroll-body" id="match-list" style="flex:1"></div>
   </div>
   <div id="match-result-view" style="flex:1;display:none;flex-direction:column;overflow:hidden">
     <div class="scroll-body" id="match-result-content"></div>
@@ -806,6 +816,8 @@ const APP = {
   forms: JSON.parse(localStorage.getItem('winner-forms') || '[]'),
   currentGames: [],
   currentPicks: {},
+  lineGames: [],
+  matchSource: 'line',
   selectedAI: localStorage.getItem('winner-ai') || 'gemini-app',
   teamValidation: { home: null, away: null }
 };
@@ -868,6 +880,11 @@ function init() {
       APP.programDate = saved.date || '';
     }
   } catch (e) {}
+  // שחזור רשימת הליין המלאה (מטמון — מתרענן אוטומטית בכניסה למסך)
+  try {
+    const savedLine = JSON.parse(localStorage.getItem('winner-line') || 'null');
+    if (savedLine && Array.isArray(savedLine.games)) APP.lineGames = savedLine.games;
+  } catch (e) {}
   loadAdminKeys(); // Load saved admin keys
   const savedMode = localStorage.getItem('winner-mode') || 'dark';
   if (savedMode === 'light') {
@@ -904,7 +921,8 @@ function showScreen(id) {
     // תמיד פותחים במסך הרשימה (לא בתוצאה של משחק קודם)
     document.getElementById('match-input-view').style.display = 'flex';
     document.getElementById('match-result-view').style.display = 'none';
-    renderMatchList();
+    const s = document.getElementById('match-search'); if (s) s.value = '';
+    setMatchSource(APP.matchSource || 'line');
   }
 }
 
@@ -1581,30 +1599,98 @@ function updateMatchBtn() {
   }
 }
 
-// ===== רשימת משחקי השבוע לבחירה (במקום הקלדת שמות) =====
+// ===== רשימת משחקים לבחירה (ליין מלא / טופס השבוע) + חיפוש =====
+// APP.matchSource: 'line' = כל משחקי הליין (עשרות) · 'form' = 16 משחקי הטופס
+function setMatchSource(src) {
+  APP.matchSource = src;
+  // עדכון מראה הטאבים
+  const on = { bg:'var(--accent-bg)', bd:'var(--accent2)', col:'var(--accent)' };
+  const off = { bg:'var(--bg2)', bd:'var(--border)', col:'var(--text2)' };
+  const set = (id, s) => { const b = document.getElementById(id); if (b){ b.style.background=s.bg; b.style.borderColor=s.bd; b.style.color=s.col; } };
+  set('mtab-line', src==='line'?on:off);
+  set('mtab-form', src==='form'?on:off);
+  if (src === 'line') {
+    if (APP.lineGames && APP.lineGames.length) { renderMatchList(); loadLineGames(true); } // מציג מטמון + מרענן ברקע
+    else loadLineGames(false);
+    return;
+  }
+  renderMatchList();
+}
+
+// טעינת כל משחקי הליין מהשרת. silent=true → מרענן ברקע בלי ספינר/הודעה
+async function loadLineGames(silent) {
+  const el = document.getElementById('match-list');
+  if (!silent && el) el.innerHTML = '<div class="card" style="text-align:center;padding:26px"><div style="font-size:13px;color:var(--text2)">⏳ טוען את כל משחקי הליין...</div></div>';
+  try {
+    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?line=1&t=' + Date.now());
+    if (!res.ok) throw new Error('שרת לא זמין (' + res.status + ')');
+    const data = await res.json();
+    if (!data.ok || !data.games) throw new Error('לא התקבלו משחקים');
+    APP.lineGames = data.games;
+    try { localStorage.setItem('winner-line', JSON.stringify({ games: data.games, ts: Date.now() })); } catch(e){}
+    if (APP.matchSource === 'line') renderMatchList();
+    if (!silent) {
+      if (data.games.length) toast('✅ ' + data.games.length + ' משחקים נטענו', 'success');
+      else toast('אין כרגע משחקי ליין פתוחים', 'info');
+    }
+  } catch (e) {
+    if (!silent) { toast('שגיאה בטעינת הליין: ' + e.message, 'error'); renderMatchList(); }
+  }
+}
+
+async function loadGamesForMatch() { // תאימות לאחור — טוען את טופס השבוע
+  try { await fetchAndStoreGames(); } catch (e) { toast('שגיאה: ' + e.message, 'error'); }
+  renderMatchList();
+}
+
+function currentMatchGames() {
+  return APP.matchSource === 'form' ? (APP.currentGames || []) : (APP.lineGames || []);
+}
+
 function renderMatchList() {
   const el = document.getElementById('match-list');
   if (!el) return;
-  const games = APP.currentGames || [];
+  if (!APP.matchSource) APP.matchSource = 'line';
+  const all = currentMatchGames();
+  const q = (document.getElementById('match-search')?.value || '').trim().toLowerCase();
 
-  if (!games.length) {
-    el.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px">
-      <div style="font-size:34px;margin-bottom:10px">📥</div>
-      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">עדיין אין משחקים טעונים</div>
-      <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:16px">טען את משחקי הווינר של השבוע, ואז פשוט בחר משחק מהרשימה לניתוח — בלי להקליד שמות.</div>
-      <button onclick="loadGamesForMatch()" id="match-load-btn" style="width:100%;padding:14px;border-radius:var(--radius-lg);background:var(--accent-bg);border:2px solid var(--accent2);color:var(--accent);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">🌐 טען את משחקי השבוע</button>
-    </div>`;
+  // ריק — מצב טעינה/הסבר
+  if (!all.length) {
+    if (APP.matchSource === 'line') {
+      el.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px">
+        <div style="font-size:34px;margin-bottom:10px">🌐</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">כל המשחקים של היום</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:16px">טען את רשימת הליין המלאה (עשרות משחקים) ובחר כל משחק לניתוח.</div>
+        <button onclick="loadLineGames()" style="width:100%;padding:14px;border-radius:var(--radius-lg);background:var(--accent-bg);border:2px solid var(--accent2);color:var(--accent);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">🌐 טען את כל המשחקים</button>
+      </div>`;
+    } else {
+      el.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px">
+        <div style="font-size:34px;margin-bottom:10px">📥</div>
+        <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">טופס השבוע עדיין לא נטען</div>
+        <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:16px">טען את 16 משחקי הווינר של השבוע.</div>
+        <button onclick="loadGamesForMatch()" style="width:100%;padding:14px;border-radius:var(--radius-lg);background:var(--accent-bg);border:2px solid var(--accent2);color:var(--accent);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">🌐 טען את טופס השבוע</button>
+      </div>`;
+    }
     return;
   }
 
-  const prog = APP.programNumber ? `מחזור ${APP.programNumber}` : 'משחקי השבוע';
+  // סינון לפי חיפוש
+  const games = q ? all.filter(g => ((g.home||'') + ' ' + (g.away||'')).toLowerCase().includes(q)) : all;
+  window.__matchListGames = games; // מקור האמת ללחיצה
+
+  const label = APP.matchSource === 'line' ? 'משחקי ליין' : (APP.programNumber ? 'מחזור ' + APP.programNumber : 'טופס השבוע');
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-    <div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${games.length}</strong> משחקים · ${prog}</div>
-    <div onclick="loadGamesForMatch()" style="font-size:11px;color:var(--accent2);cursor:pointer;text-decoration:underline">רענן</div>
+    <div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${games.length}</strong> משחקים · ${label}</div>
+    <div onclick="${APP.matchSource==='line'?'loadLineGames()':'loadGamesForMatch()'}" style="font-size:11px;color:var(--accent2);cursor:pointer;text-decoration:underline">רענן</div>
   </div>`;
 
+  if (!games.length) {
+    html += `<div style="text-align:center;padding:24px;font-size:12px;color:var(--text3)">לא נמצאו משחקים ל"${q}"</div>`;
+    el.innerHTML = html;
+    return;
+  }
+
   html += games.map((g, i) => {
-    const meta = [g.league, g.status].filter(Boolean).join(' · ');
     let tag = '';
     if (g.result) {
       const rc = g.result==='1'?'var(--green)':g.result==='2'?'var(--red)':'var(--amber)';
@@ -1616,8 +1702,12 @@ function renderMatchList() {
     } else {
       tag = `<span style="font-size:10px;color:var(--text3)">טרם נפתח</span>`;
     }
+    const meta = [g.league, g.status].filter(Boolean).join(' · ');
+    const timeBadge = g.time
+      ? `<div style="text-align:center;flex-shrink:0;min-width:38px"><div style="font-size:12px;font-weight:700;color:var(--text2)">${g.time}</div></div>`
+      : `<div style="width:24px;height:24px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${i+1}</div>`;
     return `<div onclick="analyzeSelectedGame(${i})" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)'">
-      <div style="width:24px;height:24px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${i+1}</div>
+      ${timeBadge}
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} <span style="color:var(--text3)">—</span> ${g.away}</div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
@@ -1625,34 +1715,16 @@ function renderMatchList() {
           ${tag}
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;color:var(--accent2);font-size:11px;font-weight:600">
-        נתח
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="m15 18-6-6 6-6"/></svg>
     </div>`;
   }).join('');
 
   el.innerHTML = html;
 }
 
-// טעינת המשחקים ישירות ממסך הניתוח (נשאר במסך ומציג את הרשימה)
-async function loadGamesForMatch() {
-  const btn = document.getElementById('match-load-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען...'; }
-  try {
-    await fetchAndStoreGames();
-    renderMatchList();
-    const oddsN = (APP.currentGames||[]).filter(g => g.hasOdds).length;
-    toast('✅ ' + APP.currentGames.length + ' משחקים נטענו' + (oddsN===0?' — יחסים טרם נפתחו':''), oddsN===0?'info':'success');
-  } catch (e) {
-    toast('שגיאה בטעינה: ' + e.message, 'error');
-    renderMatchList();
-  }
-}
-
-// בחירת משחק מהרשימה → ניתוח ישיר מהנתונים הטעונים (בלי משיכה מחדש, בלי בעיית רולאובר)
+// בחירת משחק מהרשימה → ניתוח ישיר מהנתונים (בלי משיכה מחדש, בלי בעיית רולאובר)
 function analyzeSelectedGame(idx) {
-  const g = (APP.currentGames || [])[idx];
+  const g = (window.__matchListGames || [])[idx];
   if (!g) { toast('המשחק לא נמצא', 'error'); return; }
   renderMatchAnalysis(g.home, g.away, g, false);
 }
