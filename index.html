@@ -419,38 +419,7 @@ textarea{resize:none}
     <div style="width:34px"></div>
   </div>
   <div id="match-input-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-    <div class="scroll-body">
-      <div id="match-ai-notice" class="notice gold" style="margin-bottom:14px">
-        <svg viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <div class="notice-text"><strong>AI מחובר</strong> — כתוב שם קבוצה, AI יאמת ויציע תיקון אם צריך</div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:4px">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
-        קבוצת בית
-      </div>
-      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:4px;transition:border-color 0.15s;position:relative" id="home-input-wrap">
-        <input type="text" id="home-team-input" placeholder='שם הקבוצה...' autocomplete="off" oninput="handleTeamInput('home-team-input','home')" style="border:none;background:transparent;padding:0;flex:1" />
-        <span id="home-status" style="flex-shrink:0;font-size:14px"></span>
-      </div>
-      <div id="home-hint-box" style="display:none;margin-bottom:8px"></div>
-      <div style="text-align:center;font-size:11px;color:var(--text3);margin:10px 0">— VS —</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:5px;display:flex;align-items:center;gap:4px">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--blue)"></div>
-        קבוצת חוץ
-      </div>
-      <div style="background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:center;gap:8px;margin-bottom:4px;transition:border-color 0.15s;position:relative" id="away-input-wrap">
-        <input type="text" id="away-team-input" placeholder='שם הקבוצה...' autocomplete="off" oninput="handleTeamInput('away-team-input','away')" style="border:none;background:transparent;padding:0;flex:1" />
-        <span id="away-status" style="flex-shrink:0;font-size:14px"></span>
-      </div>
-      <div id="away-hint-box" style="display:none;margin-bottom:8px"></div>
-    </div>
-    <div class="bottom-white">
-      <div class="btn-hint" id="match-btn-hint">הזן שתי קבוצות</div>
-      <button class="btn-primary disabled" id="match-analyze-btn" onclick="doMatchAnalysis()">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        נתח משחק
-      </button>
-    </div>
+    <div class="scroll-body" id="match-list"></div>
   </div>
   <div id="match-result-view" style="flex:1;display:none;flex-direction:column;overflow:hidden">
     <div class="scroll-body" id="match-result-content"></div>
@@ -890,6 +859,15 @@ let guideStep = 0;
 function init() {
   applyTheme(APP.theme);
   applyLang('he');
+  // שחזור משחקי השבוע האחרונים שנטענו (לרשימת הניתוח)
+  try {
+    const saved = JSON.parse(localStorage.getItem('winner-games') || 'null');
+    if (saved && Array.isArray(saved.games) && saved.games.length) {
+      APP.currentGames = saved.games;
+      APP.programNumber = saved.program || '';
+      APP.programDate = saved.date || '';
+    }
+  } catch (e) {}
   loadAdminKeys(); // Load saved admin keys
   const savedMode = localStorage.getItem('winner-mode') || 'dark';
   if (savedMode === 'light') {
@@ -922,6 +900,12 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
   if (id === 'screen-history') renderHistory();
   if (id === 'screen-home') { updateHomeStats(); updateHomeAIStatus(); }
+  if (id === 'screen-match-analysis') {
+    // תמיד פותחים במסך הרשימה (לא בתוצאה של משחק קודם)
+    document.getElementById('match-input-view').style.display = 'flex';
+    document.getElementById('match-result-view').style.display = 'none';
+    renderMatchList();
+  }
 }
 
 function applyTheme(t) {
@@ -1597,36 +1581,89 @@ function updateMatchBtn() {
   }
 }
 
-async function doMatchAnalysis() {
-  const tv = APP.teamValidation;
-  if (!tv.home || !tv.away) return;
-  const home = tv.home, away = tv.away;
+// ===== רשימת משחקי השבוע לבחירה (במקום הקלדת שמות) =====
+function renderMatchList() {
+  const el = document.getElementById('match-list');
+  if (!el) return;
+  const games = APP.currentGames || [];
+
+  if (!games.length) {
+    el.innerHTML = `<div class="card" style="text-align:center;padding:26px 18px">
+      <div style="font-size:34px;margin-bottom:10px">📥</div>
+      <div style="font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px">עדיין אין משחקים טעונים</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:16px">טען את משחקי הווינר של השבוע, ואז פשוט בחר משחק מהרשימה לניתוח — בלי להקליד שמות.</div>
+      <button onclick="loadGamesForMatch()" id="match-load-btn" style="width:100%;padding:14px;border-radius:var(--radius-lg);background:var(--accent-bg);border:2px solid var(--accent2);color:var(--accent);font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">🌐 טען את משחקי השבוע</button>
+    </div>`;
+    return;
+  }
+
+  const prog = APP.programNumber ? `מחזור ${APP.programNumber}` : 'משחקי השבוע';
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+    <div style="font-size:12px;color:var(--text2)"><strong style="color:var(--text)">${games.length}</strong> משחקים · ${prog}</div>
+    <div onclick="loadGamesForMatch()" style="font-size:11px;color:var(--accent2);cursor:pointer;text-decoration:underline">רענן</div>
+  </div>`;
+
+  html += games.map((g, i) => {
+    const meta = [g.league, g.status].filter(Boolean).join(' · ');
+    let tag = '';
+    if (g.result) {
+      const rc = g.result==='1'?'var(--green)':g.result==='2'?'var(--red)':'var(--amber)';
+      const sc = (g.scoreHome!=null&&g.scoreAway!=null)?` ${g.scoreHome}-${g.scoreAway}`:'';
+      tag = `<span style="font-size:10px;font-weight:700;color:${rc}">סופי ${g.result}${sc}</span>`;
+    } else if (g.hasOdds && g.pick && g.pick!=='?') {
+      const pc = g.pick==='1'?'var(--green)':g.pick==='X'?'var(--amber)':'var(--red)';
+      tag = `<span style="font-size:10px;font-weight:700;color:${pc}">המלצה ${g.pick}</span>`;
+    } else {
+      tag = `<span style="font-size:10px;color:var(--text3)">טרם נפתח</span>`;
+    }
+    return `<div onclick="analyzeSelectedGame(${i})" style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px;margin-bottom:8px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent2)'" onmouseout="this.style.borderColor='var(--border)'">
+      <div style="width:24px;height:24px;border-radius:6px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3);flex-shrink:0">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} <span style="color:var(--text3)">—</span> ${g.away}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px">
+          ${meta?`<span style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${meta}</span>`:''}
+          ${tag}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;color:var(--accent2);font-size:11px;font-weight:600">
+        נתח
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html;
+}
+
+// טעינת המשחקים ישירות ממסך הניתוח (נשאר במסך ומציג את הרשימה)
+async function loadGamesForMatch() {
+  const btn = document.getElementById('match-load-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען...'; }
+  try {
+    await fetchAndStoreGames();
+    renderMatchList();
+    const oddsN = (APP.currentGames||[]).filter(g => g.hasOdds).length;
+    toast('✅ ' + APP.currentGames.length + ' משחקים נטענו' + (oddsN===0?' — יחסים טרם נפתחו':''), oddsN===0?'info':'success');
+  } catch (e) {
+    toast('שגיאה בטעינה: ' + e.message, 'error');
+    renderMatchList();
+  }
+}
+
+// בחירת משחק מהרשימה → ניתוח ישיר מהנתונים הטעונים (בלי משיכה מחדש, בלי בעיית רולאובר)
+function analyzeSelectedGame(idx) {
+  const g = (APP.currentGames || [])[idx];
+  if (!g) { toast('המשחק לא נמצא', 'error'); return; }
+  renderMatchAnalysis(g.home, g.away, g, false);
+}
+
+// מרנדר את מסך הניתוח עבור משחק נתון (משמש את בחירת המשחק מהרשימה)
+function renderMatchAnalysis(home, away, match, reversed) {
   const rv = document.getElementById('match-result-view');
   const iv = document.getElementById('match-input-view');
   const content = document.getElementById('match-result-content');
   iv.style.display = 'none';
   rv.style.display = 'flex';
-  content.innerHTML = '<div class="card" style="text-align:center;padding:30px"><div style="font-size:14px;color:var(--text2)">⏳ מחפש נתונים...</div></div>';
-
-  let match = null, reversed = false, err = '';
-  try {
-    const q = encodeURIComponent(home) + '|' + encodeURIComponent(away);
-    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?h2h=' + q + '&t=' + Date.now());
-    const data = await res.json();
-    if (data.ok && data.found && data.match) { match = data.match; reversed = !!match.reversed; }
-    else err = 'המשחק לא נמצא במשחקי הווינר של השבוע';
-  } catch (e) { err = 'שגיאה בחיבור לשרת'; }
-
-  // לא נמצא בכלל
-  if (!match) {
-    content.innerHTML = '<div class="card" style="text-align:center;padding:24px">' +
-      '<div style="font-size:32px;margin-bottom:8px">🔍</div>' +
-      '<div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">' + home + ' נגד ' + away + '</div>' +
-      '<div style="font-size:12px;color:var(--text2);line-height:1.5">' + err + '</div>' +
-      '<div style="font-size:11px;color:var(--text3);margin-top:12px">ודא שהשמות נכתבו נכון. הניתוח מכסה את משחקי הווינר של השבוע.</div>' +
-      '</div>';
-    return;
-  }
 
   // עוזרים
   const norm = v => reversed ? (v==='1'?'2':v==='2'?'1':v) : v;
@@ -1714,18 +1751,9 @@ async function doMatchAnalysis() {
 }
 
 function resetMatchAnalysis() {
-  APP.teamValidation = { home: null, away: null };
-  document.getElementById('home-team-input').value = '';
-  document.getElementById('away-team-input').value = '';
-  document.getElementById('home-status').textContent = '';
-  document.getElementById('away-status').textContent = '';
-  document.getElementById('home-hint-box').style.display = 'none';
-  document.getElementById('away-hint-box').style.display = 'none';
-  document.getElementById('home-input-wrap').style.borderColor = 'var(--border)';
-  document.getElementById('away-input-wrap').style.borderColor = 'var(--border)';
   document.getElementById('match-input-view').style.display = 'flex';
   document.getElementById('match-result-view').style.display = 'none';
-  updateMatchBtn();
+  renderMatchList();
 }
 
 function renderAIOptions() {
@@ -2104,30 +2132,42 @@ ${facts}
   }
 }
 
+// מושך את משחקי השבוע מהשרת, שומר ל-APP + localStorage. מחזיר את מערך המשחקים.
+async function fetchAndStoreGames() {
+  const res = await fetch(CLOUDFLARE_WORKER_URL + '/?t=' + Date.now());
+  if (!res.ok) throw new Error('שרת לא זמין (' + res.status + ')');
+  const data = await res.json();
+  if (!data.ok || !data.games || !data.games.length) throw new Error('לא התקבלו משחקים');
+
+  APP.currentGames = data.games.map(g => ({
+    home: g.home, away: g.away, league: g.league || '',
+    status: g.status || '',
+    odds: g.odds, probs: g.probs,
+    pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
+    result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway
+  }));
+  APP.programNumber = data.program || '';
+  APP.programDate = data.date || '';
+
+  // שומר snapshot כדי שרשימת הניתוח תהיה זמינה גם אחרי ניווט/רענון
+  try {
+    localStorage.setItem('winner-games', JSON.stringify({
+      games: APP.currentGames, program: APP.programNumber, date: APP.programDate, ts: Date.now()
+    }));
+  } catch (e) {}
+  return APP.currentGames;
+}
+
 async function loadWeeklyGames() {
   const btn = document.getElementById('load-weekly-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען משחקים...'; }
   try {
-    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?t=' + Date.now());
-    if (!res.ok) throw new Error('שרת לא זמין (' + res.status + ')');
-    const data = await res.json();
-    if (!data.ok || !data.games || !data.games.length) throw new Error('לא התקבלו משחקים');
-
-    APP.currentGames = data.games.map(g => ({
-      home: g.home, away: g.away, league: g.league || '',
-      status: g.status || '',
-      odds: g.odds, probs: g.probs,
-      pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
-      result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway
-    }));
-    APP.programNumber = data.program || '';
-    APP.programDate = data.date || '';
+    await fetchAndStoreGames();
     APP.currentPicks = {};
-
     renderFormGames();
     showScreen('screen-fill-form');
-    const oddsN = data.games.filter(g => g.hasOdds).length;
-    let msg = '✅ ' + data.games.length + ' משחקים נטענו' + (data.program ? ' (מחזור ' + data.program + ')' : '');
+    const oddsN = APP.currentGames.filter(g => g.hasOdds).length;
+    let msg = '✅ ' + APP.currentGames.length + ' משחקים נטענו' + (APP.programNumber ? ' (מחזור ' + APP.programNumber + ')' : '');
     if (oddsN === 0) msg += ' — יחסים טרם נפתחו, מלא ידנית';
     toast(msg, oddsN === 0 ? 'info' : 'success');
   } catch (e) {
