@@ -1413,13 +1413,18 @@ async function fetchResultsAuto(formIdx) {
       return;
     }
 
+    ensureStrategies(form);          // משלים אסטרטגיות מהיחסים אם חסרות
     APP.pendingResults = results;
     renderResultsPreview(form, results, found, pending);
 
     const saveBtn = document.getElementById('upd-save-btn');
     if (saveBtn) { saveBtn.classList.remove('disabled'); }
     const hint = document.getElementById('upd-hint');
-    if (hint) hint.textContent = found + ' תוצאות נמצאו' + (pending ? ' · ' + pending + ' עדיין לא הסתיימו' : '');
+    if (hint) {
+      const sc = computeFormScores(form, results);
+      const mine = sc.manual;
+      hint.textContent = mine ? ('צדקת ב-' + mine.correct + '/' + mine.total + ' — שמור כדי לשמור') : (found + ' תוצאות נמצאו — שמור');
+    }
     if (btn) { btn.disabled = false; btn.textContent = '🔄 רענן תוצאות'; }
   } catch (e) {
     toast('שגיאה: ' + e.message, 'error');
@@ -1461,28 +1466,110 @@ function sameGameFuzzy(a, b) {
   return hs >= 0.5 && as >= 0.5;
 }
 
+// אם האסטרטגיות ריקות (כי היחסים לא נפתחו בזמן המילוי) — מנסה לחשב אותן מהיחסים ששמורים במשחקים
+function ensureStrategies(form) {
+  if (!form.games) return;
+  form.strategies = form.strategies || {};
+  ['safe','surprise','bold'].forEach(type => {
+    const cur = form.strategies[type];
+    if (cur && Object.keys(cur).length) return; // כבר קיים
+    const picks = {};
+    form.games.forEach((g, i) => { if (g.odds) { const c = pickByStrategy(g.odds, type); if (c) picks[i] = c; } });
+    if (Object.keys(picks).length) form.strategies[type] = picks;
+  });
+}
+
+// מחשב ציון לכל שיטה מול התוצאות. מחזיר {method:{correct,total}} רק לשיטות שיש בהן ניחושים
+function computeFormScores(form, results) {
+  const total = Object.keys(results).length;
+  const methods = {
+    safe: form.strategies?.safe,
+    surprise: form.strategies?.surprise,
+    bold: form.strategies?.bold,
+    manual: form.manual || form.picks,
+  };
+  const out = {};
+  for (const k in methods) {
+    const picks = methods[k];
+    if (!picks || !Object.keys(picks).length) { out[k] = null; continue; }
+    let correct = 0;
+    Object.keys(results).forEach(i => { if (picks[i] === results[i]) correct++; });
+    out[k] = { correct, total };
+  }
+  return out;
+}
+
+const METHOD_META = {
+  safe:     { label: '🛡️ בטוח',        picks: f => f.strategies?.safe },
+  surprise: { label: '⚡ הפתעות',       picks: f => f.strategies?.surprise },
+  bold:     { label: '⚖️ מאוזן',        picks: f => f.strategies?.bold },
+  manual:   { label: '✓ הבחירות שלך',   picks: f => (f.manual || f.picks) },
+};
+
 function renderResultsPreview(form, results, found, pending) {
   const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':v==='2'?'var(--red)':'var(--text3)';
   const pb = v => v==='1'?'var(--green-bg)':v==='X'?'var(--amber-bg)':v==='2'?'var(--red-bg)':'var(--bg3)';
+
+  // ===== כרטיס ניקוד: איזו שיטה הכי טובה + כמה צדקת =====
+  const scores = computeFormScores(form, results);
+  const ranked = Object.keys(scores).filter(k => scores[k]).sort((a,b) => scores[b].correct - scores[a].correct);
+  const bestCorrect = ranked.length ? scores[ranked[0]].correct : 0;
+
+  let scoreCard = '';
+  if (ranked.length) {
+    const rows = ranked.map(k => {
+      const s = scores[k];
+      const isBest = s.correct === bestCorrect;
+      const pctW = s.total ? Math.round(s.correct/s.total*100) : 0;
+      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:${isBest?'var(--green-bg)':'var(--bg2)'};border:1px solid ${isBest?'var(--green)':'var(--border)'};border-radius:8px;margin-bottom:5px">
+        <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${METHOD_META[k].label}${isBest?' <span style="font-size:10px;color:var(--green)">🏆 הכי טוב</span>':''}</div>
+        <div style="width:70px;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="width:${pctW}%;height:100%;background:${isBest?'var(--green)':'var(--accent2)'}"></div></div>
+        <div style="font-size:13px;font-weight:800;color:${isBest?'var(--green)':'var(--text)'};min-width:42px;text-align:left">${s.correct}/${s.total}</div>
+      </div>`;
+    }).join('');
+    const mine = scores.manual;
+    const headline = mine
+      ? `הבחירות שלך: <span style="color:${mine.correct>=bestCorrect?'var(--green)':'var(--text)'}">${mine.correct}/${mine.total}</span> נכון`
+      : `נבדקו ${found} תוצאות`;
+    scoreCard = `<div class="card" style="margin-bottom:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:2px">📊 בדיקת הטופס</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px">${headline}</div>
+      ${rows}
+    </div>`;
+  }
+
+  // ===== פירוט לפי משחק: תוצאה + הניחוש שלך + נכון/שגוי =====
+  const myPicks = form.manual || form.picks || {};
   const rows = form.games.map((g, i) => {
     const r = results[i];
-    const sc = (function(){
-      const data = window.__lastResultsData || [];
-      let m = data.find(x => Number(x.num) === i + 1);
-      if (!m) m = data.find(x => sameGameFuzzy(x, g));
-      return m && m.scoreHome!=null ? m.scoreHome+'-'+m.scoreAway : '';
-    })();
-    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:8px">
+    const my = myPicks[i];
+    const data = window.__lastResultsData || [];
+    let m = data.find(x => Number(x.num) === i + 1); if (!m) m = data.find(x => sameGameFuzzy(x, g));
+    const sc = m && m.scoreHome!=null ? m.scoreHome+'-'+m.scoreAway : '';
+    let mark = '';
+    if (r && my) mark = (r === my)
+      ? '<span style="color:var(--green);font-size:12px;font-weight:800">✓</span>'
+      : '<span style="color:var(--red);font-size:12px;font-weight:800">✗</span>';
+    const myBadge = my ? `<div style="width:20px;height:20px;border-radius:4px;background:${pb(my)};color:${pc(my)};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;opacity:.85">${my}</div>` : '';
+    return `<div style="display:flex;align-items:center;gap:7px;padding:6px 8px;background:var(--bg2);border-radius:8px">
       <div style="font-size:10px;color:var(--text3);width:16px">${i+1}</div>
       <div style="flex:1;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} - ${g.away}</div>
       ${sc?`<div style="font-size:10px;color:var(--text3)">${sc}</div>`:''}
+      ${myBadge}
+      <div style="font-size:9px;color:var(--text3)">←</div>
       <div style="width:22px;height:22px;border-radius:5px;background:${pb(r)};color:${pc(r)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${r||'?'}</div>
+      <div style="width:14px;text-align:center">${mark}</div>
     </div>`;
   }).join('');
+
   const el = document.getElementById('results-preview');
   el.style.display = 'block';
-  el.innerHTML = `<div style="margin-bottom:10px">
-    <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:8px">תוצאות שנמצאו (${found}/${form.games.length})</div>
+  el.innerHTML = `${scoreCard}
+  <div style="margin-bottom:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:var(--text)">תוצאות (${found}/${form.games.length})</div>
+      <div style="font-size:10px;color:var(--text3)">הניחוש שלך ← התוצאה</div>
+    </div>
     <div style="display:flex;flex-direction:column;gap:4px">${rows}</div>
   </div>`;
 }
@@ -1492,26 +1579,26 @@ function saveResults(formIdx) {
   if (!results || !Object.keys(results).length) { toast('אין תוצאות לשמירה','e'); return; }
   const form = APP.forms[formIdx];
   form.results = results;
+  ensureStrategies(form);
 
-  // מחשב ציון לכל אסטרטגיה + לבחירות שלך
-  const scoreOf = picks => {
-    let c = 0, total = 0;
-    Object.keys(results).forEach(i => { total++; if (picks && picks[i] === results[i]) c++; });
-    return { correct: c, total };
-  };
+  const sc = computeFormScores(form, results);
   form.scores = {
-    safe: scoreOf(form.strategies?.safe),
-    surprise: scoreOf(form.strategies?.surprise),
-    bold: scoreOf(form.strategies?.bold),
-    manual: scoreOf(form.manual || form.picks),
+    safe: sc.safe || { correct: 0, total: Object.keys(results).length },
+    surprise: sc.surprise || { correct: 0, total: Object.keys(results).length },
+    bold: sc.bold || { correct: 0, total: Object.keys(results).length },
+    manual: sc.manual || { correct: 0, total: Object.keys(results).length },
   };
+  // השיטה המנצחת (מבין השיטות שיש בהן ניחושים)
+  const ranked = Object.keys(sc).filter(k => sc[k]).sort((a,b) => sc[b].correct - sc[a].correct);
+  form.best = ranked.length ? { method: ranked[0], correct: sc[ranked[0]].correct, total: sc[ranked[0]].total } : null;
   // הציון הראשי = הבחירות שלך
   form.score = form.scores.manual.correct;
 
   APP.forms[formIdx] = form;
   localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
   updateHomeStats();
-  toast('✅ תוצאות נשמרו!', 's');
+  const mine = sc.manual;
+  toast(mine ? ('✅ נשמר! צדקת ב-' + mine.correct + '/' + mine.total) : '✅ תוצאות נשמרו!', 's');
   showScreen('screen-history');
   renderHistory();
 }
@@ -2120,37 +2207,41 @@ async function callAI(prompt, opts) {
   throw new Error('ספק AI לא מזוהה');
 }
 
-// Gemini — שרשרת מודלים מהחדש לישן עד שאחד עובד. deep → מפעיל חיפוש Google (grounding)
-const GEMINI_MODELS = ['gemini-2.5-flash','gemini-2.0-flash','gemini-flash-latest','gemini-1.5-flash'];
+// Gemini — מודלים חיים בלבד (1.5 ו-2.0 הוסרו). deep → מנסה עם חיפוש Google, ואם נכשל — בלי.
+const GEMINI_MODELS = ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-flash-latest'];
 async function callGeminiBYOK(prompt, apiKey, opts) {
   opts = opts || {};
   if (!apiKey) throw new Error('מפתח Gemini לא הוגדר');
-  let working = localStorage.getItem('winner-gemini-model');
-  const models = working ? [working, ...GEMINI_MODELS.filter(m => m !== working)] : GEMINI_MODELS;
+  const stored = localStorage.getItem('winner-gemini-model');
+  const chain = stored ? [stored, ...GEMINI_MODELS.filter(m => m !== stored)] : GEMINI_MODELS.slice();
   let lastErr = null;
-  for (const model of models) {
-    const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.deep ? 2000 : 4000 };
-    if (model.indexOf('gemini-2.5') === 0) genCfg.thinkingConfig = { thinkingBudget: 0 };
-    const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg };
-    if (opts.deep) body.tools = [{ google_search: {} }]; // חיפוש אינטרנט חי
-    try {
-      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-      if (res.ok) {
-        localStorage.setItem('winner-gemini-model', model);
-        const data = await res.json();
-        const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
-        return parts.map(p => (p && p.text) || '').join('\n');
-      }
-      const e = await res.json().catch(() => ({}));
-      lastErr = new Error((e.error && e.error.message) || ('HTTP ' + res.status));
-      // אם החיפוש לא נתמך במודל — ננסה שוב בלי כלים
-      if (opts.deep && /tool|search|function/i.test(lastErr.message)) { opts = Object.assign({}, opts, { deep: false }); }
-      if (res.status === 429) localStorage.removeItem('winner-gemini-model');
-      if (res.status !== 404 && res.status !== 429 && res.status !== 500 && res.status !== 503) throw lastErr;
-    } catch (err) { lastErr = err; }
+  for (const model of chain) {
+    const attempts = opts.deep ? [true, false] : [false]; // עם כלים ואז בלי
+    let deadModel = false;
+    for (const useTools of attempts) {
+      const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.deep ? 2000 : 4000 };
+      if (model.indexOf('gemini-2.5') === 0) genCfg.thinkingConfig = { thinkingBudget: 0 };
+      const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg };
+      if (useTools) body.tools = [{ google_search: {} }];
+      try {
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const parts = (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts) || [];
+          const text = parts.map(p => (p && p.text) || '').join('\n').trim();
+          if (text) { localStorage.setItem('winner-gemini-model', model); return text; }
+          lastErr = new Error('המודל החזיר תשובה ריקה'); continue; // ננסה בלי כלים / מודל אחר
+        }
+        const e = await res.json().catch(() => ({}));
+        lastErr = new Error((e.error && e.error.message) || ('HTTP ' + res.status));
+        if (res.status === 404) { localStorage.removeItem('winner-gemini-model'); deadModel = true; break; } // מודל לא קיים → למודל הבא
+        if (res.status === 429) { localStorage.removeItem('winner-gemini-model'); }
+        // שגיאה אחרת (למשל כלי לא נתמך) → ננסה שוב בלי כלים, אחרת מודל אחר
+      } catch (err) { lastErr = err; }
+    }
+    if (deadModel) continue;
   }
   throw lastErr || new Error('אין מודל Gemini זמין');
 }
@@ -2158,7 +2249,7 @@ async function callGeminiBYOK(prompt, apiKey, opts) {
 async function callClaudeBYOK(prompt, apiKey, opts) {
   opts = opts || {};
   if (!apiKey) throw new Error('מפתח Claude לא הוגדר');
-  const body = { model: 'claude-3-5-haiku-20241022', max_tokens: opts.deep ? 1800 : 2000, messages: [{ role: 'user', content: prompt }] };
+  const body = { model: 'claude-haiku-4-5-20251001', max_tokens: opts.deep ? 1800 : 2000, messages: [{ role: 'user', content: prompt }] };
   if (opts.deep) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }]; // חיפוש אינטרנט חי
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
