@@ -1395,11 +1395,14 @@ async function fetchResultsAuto(formIdx) {
     if (!data.ok || !data.games) throw new Error('לא התקבלו נתונים');
     window.__lastResultsData = data.games;
 
-    // ממפים תוצאות בהתאמת שמות גמישה
+    // התאמה חסינה: קודם לפי מספר המשחק (1-16), אחר כך לפי שם גמיש
+    const byNum = {};
+    data.games.forEach(x => { if (x.num != null) byNum[Number(x.num)] = x; });
     const results = {};
     let found = 0, pending = 0;
     form.games.forEach((g, i) => {
-      const match = data.games.find(x => sameGameFuzzy(x, g));
+      let match = byNum[i + 1] || null;               // המשחק ה-i בטופס = מספר i+1 בתוצאות
+      if (!match) match = data.games.find(x => sameGameFuzzy(x, g)); // גיבוי לפי שם
       if (match && match.result) { results[i] = match.result; found++; }
       else pending++;
     });
@@ -1464,7 +1467,9 @@ function renderResultsPreview(form, results, found, pending) {
   const rows = form.games.map((g, i) => {
     const r = results[i];
     const sc = (function(){
-      const m = (window.__lastResultsData||[]).find(x=>sameGameFuzzy(x,g));
+      const data = window.__lastResultsData || [];
+      let m = data.find(x => Number(x.num) === i + 1);
+      if (!m) m = data.find(x => sameGameFuzzy(x, g));
       return m && m.scoreHome!=null ? m.scoreHome+'-'+m.scoreAway : '';
     })();
     return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--bg2);border-radius:8px">
@@ -2103,31 +2108,35 @@ function aiIsConnected() {
   return false;
 }
 
-async function callAI(prompt) {
+async function callAI(prompt, opts) {
+  opts = opts || {};
   const c = getAIConfig();
   if (!c.provider) throw new Error('לא מחובר ל-AI. חבר AI קודם דרך מסך ה-AI.');
-  if (c.provider === 'gemini') return await callGeminiBYOK(prompt, c.geminiKey);
-  if (c.provider === 'claude') return await callClaudeBYOK(prompt, c.claudeKey);
-  if (c.provider === 'openai') return await callOpenAIBYOK(prompt, c.openaiKey);
+  if (c.provider === 'gemini') return await callGeminiBYOK(prompt, c.geminiKey, opts);
+  if (c.provider === 'claude') return await callClaudeBYOK(prompt, c.claudeKey, opts);
+  if (c.provider === 'openai') return await callOpenAIBYOK(prompt, c.openaiKey, opts);
   if (c.provider === 'device') return await callOpenAICompatible(prompt, c.deviceUrl, '', 'llama3');
   if (c.provider === 'custom') return await callOpenAICompatible(prompt, c.customUrl, c.customKey, 'gpt-3.5-turbo');
   throw new Error('ספק AI לא מזוהה');
 }
 
-// Gemini — שרשרת מודלים מהחדש לישן עד שאחד עובד
+// Gemini — שרשרת מודלים מהחדש לישן עד שאחד עובד. deep → מפעיל חיפוש Google (grounding)
 const GEMINI_MODELS = ['gemini-2.5-flash','gemini-2.0-flash','gemini-flash-latest','gemini-1.5-flash'];
-async function callGeminiBYOK(prompt, apiKey) {
+async function callGeminiBYOK(prompt, apiKey, opts) {
+  opts = opts || {};
   if (!apiKey) throw new Error('מפתח Gemini לא הוגדר');
   let working = localStorage.getItem('winner-gemini-model');
   const models = working ? [working, ...GEMINI_MODELS.filter(m => m !== working)] : GEMINI_MODELS;
   let lastErr = null;
   for (const model of models) {
-    const genCfg = { temperature: 0.3, maxOutputTokens: 4000 };
+    const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.deep ? 2000 : 4000 };
     if (model.indexOf('gemini-2.5') === 0) genCfg.thinkingConfig = { thinkingBudget: 0 };
+    const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg };
+    if (opts.deep) body.tools = [{ google_search: {} }]; // חיפוש אינטרנט חי
     try {
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + apiKey, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg })
+        body: JSON.stringify(body)
       });
       if (res.ok) {
         localStorage.setItem('winner-gemini-model', model);
@@ -2137,6 +2146,8 @@ async function callGeminiBYOK(prompt, apiKey) {
       }
       const e = await res.json().catch(() => ({}));
       lastErr = new Error((e.error && e.error.message) || ('HTTP ' + res.status));
+      // אם החיפוש לא נתמך במודל — ננסה שוב בלי כלים
+      if (opts.deep && /tool|search|function/i.test(lastErr.message)) { opts = Object.assign({}, opts, { deep: false }); }
       if (res.status === 429) localStorage.removeItem('winner-gemini-model');
       if (res.status !== 404 && res.status !== 429 && res.status !== 500 && res.status !== 503) throw lastErr;
     } catch (err) { lastErr = err; }
@@ -2144,19 +2155,26 @@ async function callGeminiBYOK(prompt, apiKey) {
   throw lastErr || new Error('אין מודל Gemini זמין');
 }
 
-async function callClaudeBYOK(prompt, apiKey) {
+async function callClaudeBYOK(prompt, apiKey, opts) {
+  opts = opts || {};
   if (!apiKey) throw new Error('מפתח Claude לא הוגדר');
+  const body = { model: 'claude-3-5-haiku-20241022', max_tokens: opts.deep ? 1800 : 2000, messages: [{ role: 'user', content: prompt }] };
+  if (opts.deep) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }]; // חיפוש אינטרנט חי
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-    body: JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 2000, messages: [{ role: 'user', content: prompt }] })
+    body: JSON.stringify(body)
   });
-  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e.error && e.error.message) || ('HTTP ' + res.status)); }
+  if (!res.ok) {
+    // אם חיפוש האינטרנט לא זמין למפתח — ננסה שוב בלי כלים
+    if (opts.deep) { return await callClaudeBYOK(prompt, apiKey, Object.assign({}, opts, { deep: false })); }
+    const e = await res.json().catch(() => ({})); throw new Error((e.error && e.error.message) || ('HTTP ' + res.status));
+  }
   const data = await res.json();
-  return (data.content || []).map(b => b.text || '').join('\n');
+  return (data.content || []).filter(b => b.type === 'text').map(b => b.text || '').join('\n');
 }
 
-async function callOpenAIBYOK(prompt, apiKey) {
+async function callOpenAIBYOK(prompt, apiKey, opts) {
   return await callOpenAICompatible(prompt, 'https://api.openai.com/v1/chat/completions', apiKey, 'gpt-4o-mini');
 }
 async function callOpenAICompatible(prompt, url, apiKey, model) {
@@ -2169,32 +2187,46 @@ async function callOpenAICompatible(prompt, url, apiKey, model) {
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
 }
 
-// ניתוח AI מעמיק למשחק בודד (משתמש בנתונים האמיתיים שיש לנו — לא ממציא משחקים)
+// ניתוח AI מעמיק ועצמאי — חושב לבד, מחפש באינטרנט, ולא רק מקריא את הסטטיסטיקה שלנו
 async function aiDeepAnalysis() {
   const ctx = window.__lastH2H;
   if (!ctx) return;
   const box = document.getElementById('ai-deep-result');
-  if (box) box.innerHTML = '<div class="card" style="text-align:center;padding:16px"><div style="font-size:12px;color:var(--text2)">🤖 ה-AI מנתח את המשחק...</div></div>';
+  if (box) box.innerHTML = '<div class="card" style="text-align:center;padding:16px"><div style="font-size:12px;color:var(--text2)">🤖 ה-AI חוקר ומנתח את המשחק לעומק... (עד דקה)</div></div>';
 
   const m = ctx.match;
-  let facts = `משחק: ${ctx.home} נגד ${ctx.away}.`;
-  if (m.league) facts += ` ליגה: ${m.league}.`;
-  if (m.status) facts += ` סטטוס: ${m.status}.`;
-  if (m.hasOdds && m.odds) facts += ` יחסי הימור (ליין): 1=${m.odds['1']}, X=${m.odds['X']}, 2=${m.odds['2']}.`;
-  if (m.result) facts += ` תוצאה סופית: ${m.scoreHome}-${m.scoreAway}.`;
+  // מוסרים למודל רק את זהות המשחק — לא את היחסים — כדי שיחשוב לבד ולא יקריא סטטיסטיקה
+  let ctxLine = `${ctx.home} נגד ${ctx.away}`;
+  if (m.league) ctxLine += ` (${m.league})`;
+  if (m.time) ctxLine += `, שעת פתיחה ${m.time}`;
 
-  const prompt = `אתה פרשן כדורגל מומחה. נתח את המשחק הבא בקצרה ובעברית, בהתבסס רק על המידע שסופק (אל תמציא נתונים או תוצאות שלא נמסרו).
+  const today = new Date().toLocaleDateString('he-IL');
 
-${facts}
+  const prompt = `אתה אנליסט כדורגל מקצועי ועצמאי. נתח לעומק את המשחק הבא ותן תחזית משלך.
 
-תן ניתוח קצר (3-4 משפטים) שכולל: מי הפייבוריט ולמה, מה הסיכונים, והמלצה על 1/X/2. אם יש יחסי ליין, התייחס אליהם. אם אין מספיק מידע, אמור זאת בכנות. השב בעברית בלבד, בפסקה אחת רציפה, ללא כותרות.`;
+המשחק: ${ctxLine}.
+התאריך היום: ${today}.
+
+חשוב מאוד:
+• חשוב בעצמך ותביע דעה עצמאית — אל תסתפק בחזרה על יחסי הימור או סטטיסטיקה יבשה.
+• אם יש לך גישה לחיפוש באינטרנט — השתמש בו כדי למצוא מידע עדכני (כושר נוכחי, פציעות והשעיות, תוצאות אחרונות, חדשות סביב הקבוצות, מפגשים קודמים).
+• התבסס על הידע שלך גם אם אין חיפוש.
+
+כלול בניתוח:
+1. מצב וכושר עדכני של כל קבוצה.
+2. פציעות/השעיות/שחקנים חשובים אם ידועים.
+3. מפגשים קודמים ראש-בראש והקשר (יתרון בית, מוטיבציה, חשיבות המשחק).
+4. הערכה טקטית קצרה.
+5. התחזית שלך: 1 (ניצחון בית), X (תיקו) או 2 (ניצחון חוץ), עם רמת ביטחון ונימוק.
+
+כתוב בעברית, בצורה זורמת וברורה, 6-10 משפטים. אם אתה לא בטוח בפרט מסוים — אמור זאת בכנות במקום להמציא.`;
 
   try {
-    const txt = await callAI(prompt);
+    const txt = await callAI(prompt, { deep: true });
     const clean = (txt || '').trim();
     if (box) box.innerHTML = `<div class="card" style="border-color:var(--accent2)">
-      <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🤖 ניתוח AI</div>
-      <div style="font-size:12px;color:var(--text);line-height:1.7">${clean.replace(/</g,'&lt;')}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🤖 ניתוח AI מעמיק</div>
+      <div style="font-size:12px;color:var(--text);line-height:1.7;white-space:pre-wrap">${clean.replace(/</g,'&lt;')}</div>
     </div>`;
   } catch (e) {
     if (box) box.innerHTML = `<div class="card" style="border-color:var(--red-border)">
