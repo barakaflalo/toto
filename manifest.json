@@ -1,28 +1,20 @@
 {
-  "name": "Winner אנליזר",
-  "short_name": "Winner",
-  "description": "ניתוח טופס וינר 16 עם AI",
-  "start_url": "/toto/",
-  "display": "standalone",
-  "background_color": "#0d0d0d",
-  "theme_color": "#d4a843",
-  "orientation": "portrait",
+  "name": "Winner אנליזר — טוטו 16",
+  "short_name": "Winner 16",
+  "description": "ניתוח חכם לטופס ווינר 16: יחסי ליין, אסטרטגיות, בדיקת תוצאות וניתוח AI.",
   "lang": "he",
   "dir": "rtl",
-  "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0a0a",
+  "theme_color": "#0a0a0a",
   "categories": ["sports", "utilities"],
-  "screenshots": []
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
 }
