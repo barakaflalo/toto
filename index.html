@@ -885,6 +885,7 @@ function init() {
     const savedLine = JSON.parse(localStorage.getItem('winner-line') || 'null');
     if (savedLine && Array.isArray(savedLine.games)) APP.lineGames = savedLine.games;
   } catch (e) {}
+  cleanAllStoredNames();  // מנקה שמות מזוהמים (תווית ליגה) גם בטפסים ישנים ששמורים
   loadAdminKeys(); // Load saved admin keys
   const savedMode = localStorage.getItem('winner-mode') || 'dark';
   if (savedMode === 'light') {
@@ -1466,7 +1467,33 @@ function sameGameFuzzy(a, b) {
   return hs >= 0.5 && as >= 0.5;
 }
 
-// אם האסטרטגיות ריקות (כי היחסים לא נפתחו בזמן המילוי) — מנסה לחשב אותן מהיחסים ששמורים במשחקים
+// ניקוי שמות בצד הלקוח (מראה נכון גם לטפסים ישנים ששמורים עם תווית ליגה)
+const CL_STATUS = "הסתיים|משוחק|מבוטל|נדחה|הפסקה|ט\\.נ|טרם התחיל|טרם|סגור";
+const CL_DAYS = "ראשון|שני|שלישי|רביעי|חמישי|שישי|שבת|היום|מחר|מחרתיים|אתמול";
+const CL_PREFIX = ["הטוטו","טוטו","שלח טופס","winner","vote","הצבעה","הצבע","ליגת","ליגה","ליג","גביע","מונדיאל","פרמיירליג","פרמייר","קונפרנס","סופרליג","סופר","אליפות","ידידות","פלייאוף","מוקדמות","קלאסיקו","העל","לאומית","לאומי","ראשונה","שנייה","שניה","שלישית","רביעית","בכירה","מקצוענית","בינלאומית","בינלאומי","נשים","נוער","צעירים","בלגית","ברזילאית","אנגלי","אנגלית","נורבגית","שבדית","פינית","ארגנטינאית","ספרדית","איטלקית","גרמנית","צרפתית","הולנדית","פורטוגלית","טורקית","יוונית","דנית","שוויצרית","אוסטרית","פולנית","צ'כית","רוסית","אוקראינית","סקוטית","אירית","וולשית","מקסיקנית","אמריקאית","יפנית","קוריאנית","סינית","אוסטרלית","ישראלית","רומנית","קרואטית","סרבית","הונגרית","סלובקית","סלובנית","בולגרית"];
+function _clEsc(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function cleanNm(s) {
+  let t = (s || '').trim(); if (!t) return t;
+  let ch = true, g = 0;
+  while (ch && g++ < 40) {
+    ch = false; const b = t;
+    t = t.replace(new RegExp("^(?:" + CL_STATUS + ")\\s+"), '');
+    t = t.replace(new RegExp("^(?:" + CL_DAYS + ")\\s+\\d{1,2}:\\d{2}\\s+"), '');
+    t = t.replace(new RegExp("^(?:" + CL_DAYS + ")\\s+"), '');
+    t = t.replace(/^\d{1,2}:\d{2}\s+/, '');
+    t = t.replace(/^\d{1,2}'\s+/, '');
+    for (const tok of CL_PREFIX) { const rx = new RegExp("^" + _clEsc(tok) + "\\s+", "i"); if (rx.test(t)) t = t.replace(rx, ''); }
+    t = t.trim(); if (t !== b) ch = true;
+  }
+  for (const tok of ["הטוטו","טוטו"]) { const rx = new RegExp("\\s+" + tok + "$", "i"); if (rx.test(t)) t = t.replace(rx, '').trim(); }
+  return t.trim();
+}
+function cleanGamesArr(arr) { if (Array.isArray(arr)) arr.forEach(g => { if (g && g.home) g.home = cleanNm(g.home); if (g && g.away) g.away = cleanNm(g.away); }); }
+function cleanAllStoredNames() {
+  (APP.forms || []).forEach(f => cleanGamesArr(f.games));
+  cleanGamesArr(APP.currentGames);
+  cleanGamesArr(APP.lineGames);
+}
 function ensureStrategies(form) {
   if (!form.games) return;
   form.strategies = form.strategies || {};
