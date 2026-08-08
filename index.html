@@ -404,6 +404,8 @@ textarea{resize:none}
       <button onclick="applyStrategy('bold')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--red-border);background:transparent;font-size:10px;font-weight:600;color:var(--red);cursor:pointer;font-family:var(--font)">⚖️ מאוזן</button>
       <button onclick="clearAllPicks()" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--font)">✕ נקה</button>
     </div>
+    <button id="ai-column-btn" onclick="generateAIColumn()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🤖 צור טור AI מבוסס נתונים</button>
+    <div id="ai-column-result" style="margin-bottom:8px"></div>
     <div id="form-games-list" style="display:flex;flex-direction:column;gap:5px"></div>
     <div style="height:8px"></div>
   </div>
@@ -2549,6 +2551,123 @@ function toggleKeyVisibility() {
   const inp = document.getElementById('ai-key-input');
   if (!inp) return;
   inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+// ===== טור AI — מבוסס על תיקי הנתונים מה-Worker (D1) =====
+// מושך /?dossier=1, בונה פרומפט אחד עם כל 16 המשחקים, שולח למפתח של המשתמש, ומקבל בחירה+נימוק לכל משחק.
+let AI_COLUMN = null; // {picks:{i:'1'}, items:[...]}
+
+function fmtRecord(r) {
+  if (!r || !r.played) return 'אין נתונים';
+  return `${r.form ? r.form.join('') : ''} · ${r.w}נ ${r.d}ת ${r.l}ה · ממוצע שערים ${r.gfAvg}-${r.gaAvg}`;
+}
+function buildColumnPrompt(dossiers) {
+  let s = `אתה אנליסט כדורגל מקצועי. לפניך ${dossiers.length} משחקים מטופס טוטו 16, כל אחד עם נתוני כושר אמיתיים שחושבו מתוצאות עבר.
+המשימה: לכל משחק, בחר 1 (ניצחון בית), X (תיקו) או 2 (ניצחון חוץ), עם רמת ביטחון ונימוק קצר.
+
+חוקים מחייבים:
+• התבסס אך ורק על הנתונים שמסופקים כאן. אל תמציא פציעות/הרכבים/נתונים שלא ניתנו.
+• אם איכות הנתונים היא "none" או "basic" — כתוב בנימוק "מעט נתונים" ותן ביטחון נמוך.
+• ציין אם אתה מסכים עם הפייבוריט של השוק (היחסים) או חולק עליו.
+
+הנתונים:
+`;
+  dossiers.forEach((d, i) => {
+    const num = i + 1;
+    const odds = d.odds ? `1:${d.odds['1']} X:${d.odds['X']} 2:${d.odds['2']}` : 'אין יחסים';
+    s += `\n[משחק ${num}] ${d.home} נגד ${d.away}${d.league ? ' (' + d.league + ')' : ''}
+כושר בית (${d.home}): ${fmtRecord(d.homeForm)}
+כושר בית-בבית: ${fmtRecord(d.homeAtHome)}
+כושר חוץ (${d.away}): ${fmtRecord(d.awayForm)}
+כושר חוץ-בחוץ: ${fmtRecord(d.awayAtAway)}
+ראש-בראש: ${d.h2h && d.h2h.played ? d.h2h.aWins + ' לבית, ' + d.h2h.draws + ' תיקו, ' + d.h2h.bWins + ' לחוץ' : 'אין'}
+יחסי שוק: ${odds} | איכות נתונים: ${d.dataQuality}\n`;
+  });
+  s += `\nהחזר אך ורק JSON תקין במבנה הבא, בלי טקסט נוסף ובלי סימוני קוד:
+[{"num":1,"pick":"1","confidence":"גבוהה","market":"מסכים","reason":"נימוק קצר בעברית"}, ...]
+confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2".`;
+  return s;
+}
+function parseColumnResponse(txt, n) {
+  let t = (txt || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim();
+  const a = t.indexOf('['), b = t.lastIndexOf(']');
+  if (a >= 0 && b > a) t = t.slice(a, b + 1);
+  const arr = JSON.parse(t);
+  if (!Array.isArray(arr)) throw new Error('תשובה לא במבנה צפוי');
+  return arr;
+}
+
+async function generateAIColumn() {
+  if (!aiIsConnected()) { showNoAI('screen-load-form'); return; }
+  const btn = document.getElementById('ai-column-btn');
+  const box = document.getElementById('ai-column-result');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ מושך נתונים...'; }
+  if (box) box.innerHTML = '';
+  try {
+    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?dossier=1&t=' + Date.now());
+    const data = await res.json();
+    if (!data.games || !data.games.length) {
+      if (box) box.innerHTML = `<div class="card" style="border-color:var(--amber-border)"><div style="font-size:12px;color:var(--text2)">${(data.note || 'משחקי השבוע לא זמינים כרגע').replace(/</g,'&lt;')}</div></div>`;
+      return;
+    }
+    const dossiers = data.games;
+    const qNone = dossiers.filter(d => d.dataQuality === 'none' || d.dataQuality === 'basic').length;
+    if (btn) btn.textContent = '🤖 ה-AI מנתח 16 משחקים...';
+    const prompt = buildColumnPrompt(dossiers);
+    const txt = await callAI(prompt, { deep: false });
+    const items = parseColumnResponse(txt, dossiers.length);
+
+    const picks = {};
+    items.forEach(it => { const idx = Number(it.num) - 1; if (idx >= 0 && idx < dossiers.length && /^[1X2]$/.test(it.pick)) picks[idx] = it.pick; });
+    AI_COLUMN = { picks, items, dossiers };
+    renderAIColumn(dossiers, items, qNone);
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="card" style="border-color:var(--red-border)"><div style="font-size:12px;color:var(--red)">שגיאת AI: ${String(e.message||e).replace(/</g,'&lt;')}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">אם זה קרה בגלל מבנה התשובה — נסה שוב.</div></div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🤖 צור טור AI מבוסס נתונים'; }
+  }
+}
+
+function renderAIColumn(dossiers, items, qNone) {
+  const box = document.getElementById('ai-column-result');
+  if (!box) return;
+  const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':v==='2'?'var(--red)':'var(--text3)';
+  const pb = v => v==='1'?'var(--green-bg)':v==='X'?'var(--amber-bg)':v==='2'?'var(--red-bg)':'var(--bg3)';
+  const byNum = {}; items.forEach(it => byNum[Number(it.num)] = it);
+  let rows = '';
+  dossiers.forEach((d, i) => {
+    const it = byNum[i + 1] || {};
+    const pick = /^[1X2]$/.test(it.pick) ? it.pick : '?';
+    const conf = it.confidence || '';
+    const market = it.market === 'חולק' ? '<span style="color:var(--amber);font-size:9px">⚡ חולק על השוק</span>' : (it.market === 'מסכים' ? '<span style="color:var(--text3);font-size:9px">מסכים עם השוק</span>' : '');
+    const qbadge = (d.dataQuality === 'none' || d.dataQuality === 'basic') ? '<span style="color:var(--text3);font-size:9px">· מעט נתונים</span>' : '';
+    rows += `<div style="padding:8px;background:var(--bg2);border-radius:8px;margin-bottom:5px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="font-size:10px;color:var(--text3);width:16px">${i+1}</div>
+        <div style="flex:1;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.home} - ${d.away}</div>
+        <div style="font-size:9px;color:var(--text3)">${conf}</div>
+        <div style="width:24px;height:24px;border-radius:6px;background:${pb(pick)};color:${pc(pick)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">${pick}</div>
+      </div>
+      ${it.reason ? `<div style="font-size:10px;color:var(--text2);line-height:1.5;margin-top:5px">${String(it.reason).replace(/</g,'&lt;')} ${market} ${qbadge}</div>` : ''}
+    </div>`;
+  });
+  box.innerHTML = `<div class="card" style="border-color:var(--accent2)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--accent)">🤖 טור AI</div>
+      <div style="font-size:9px;color:var(--text3)">מבוסס על נתוני כושר אמיתיים</div>
+    </div>
+    ${qNone ? `<div style="font-size:10px;color:var(--text3);margin-bottom:8px;line-height:1.5">⚠️ ל-${qNone} משחקים יש מעט נתונים היסטוריים כרגע — הביטחון בהם נמוך. המאגר מתמלא עם הזמן.</div>` : ''}
+    ${rows}
+    <button onclick="applyAIColumnPicks()" class="btn-gold" style="width:100%;margin-top:8px;padding:10px">✓ החל את בחירות ה-AI על הטופס</button>
+  </div>`;
+}
+
+function applyAIColumnPicks() {
+  if (!AI_COLUMN || !AI_COLUMN.picks) { toast('אין טור AI', 'i'); return; }
+  APP.currentPicks = Object.assign({}, APP.currentPicks, AI_COLUMN.picks);
+  renderFormGames();
+  const n = Object.keys(AI_COLUMN.picks).length;
+  toast('✅ הוחלו ' + n + ' בחירות AI על הטופס', 's');
 }
 
 // ניתוח AI מעמיק ועצמאי — חושב לבד, מחפש באינטרנט, ולא רק מקריא את הסטטיסטיקה שלנו
