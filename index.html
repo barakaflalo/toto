@@ -2515,8 +2515,8 @@ async function callAI(prompt, opts) {
   if (c.provider === 'gemini') return await callGeminiBYOK(prompt, c.geminiKey, opts);
   if (c.provider === 'claude') return await callClaudeBYOK(prompt, c.claudeKey, opts);
   if (c.provider === 'openai') return await callOpenAIBYOK(prompt, c.openaiKey, opts);
-  if (c.provider === 'device') return await callOpenAICompatible(prompt, c.deviceUrl, '', 'llama3');
-  if (c.provider === 'custom') return await callOpenAICompatible(prompt, c.customUrl, c.customKey, 'gpt-3.5-turbo');
+  if (c.provider === 'device') return await callOpenAICompatible(prompt, c.deviceUrl, '', 'llama3', opts);
+  if (c.provider === 'custom') return await callOpenAICompatible(prompt, c.customUrl, c.customKey, 'gpt-3.5-turbo', opts);
   throw new Error('ספק AI לא מזוהה');
 }
 
@@ -2534,7 +2534,7 @@ async function callGeminiBYOK(prompt, apiKey, opts) {
     const attempts = opts.deep ? [true, false] : [false]; // עם כלים ואז בלי
     let deadModel = false;
     for (const useTools of attempts) {
-      const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.deep ? 2000 : 4000 };
+      const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.maxTokens || (opts.deep ? 2000 : 4000) };
       if (/gemini-2\.5/.test(model)) genCfg.thinkingConfig = { thinkingBudget: 0 };
       const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg };
       if (useTools) body.tools = [{ google_search: {} }];
@@ -2563,7 +2563,7 @@ async function callGeminiBYOK(prompt, apiKey, opts) {
 async function callClaudeBYOK(prompt, apiKey, opts) {
   opts = opts || {};
   if (!apiKey) throw new Error('מפתח Claude לא הוגדר');
-  const body = { model: 'claude-haiku-4-5-20251001', max_tokens: opts.deep ? 1800 : 2000, messages: [{ role: 'user', content: prompt }] };
+  const body = { model: 'claude-haiku-4-5-20251001', max_tokens: opts.maxTokens || (opts.deep ? 1800 : 2000), messages: [{ role: 'user', content: prompt }] };
   if (opts.deep) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }]; // חיפוש אינטרנט חי
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -2581,13 +2581,14 @@ async function callClaudeBYOK(prompt, apiKey, opts) {
 
 async function callOpenAIBYOK(prompt, apiKey, opts) {
   const model = localStorage.getItem('winner-model-openai') || 'gpt-4o-mini';
-  return await callOpenAICompatible(prompt, 'https://api.openai.com/v1/chat/completions', apiKey, model);
+  return await callOpenAICompatible(prompt, 'https://api.openai.com/v1/chat/completions', apiKey, model, opts);
 }
-async function callOpenAICompatible(prompt, url, apiKey, model) {
+async function callOpenAICompatible(prompt, url, apiKey, model, opts) {
+  opts = opts || {};
   if (!url) throw new Error('כתובת API לא הוגדרה');
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 2000 }) });
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: opts.maxTokens || 2000 }) });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error((e.error && e.error.message) || ('HTTP ' + res.status)); }
   const data = await res.json();
   return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
@@ -2849,7 +2850,7 @@ function buildColumnPrompt(dossiers, reinforced, wantD, wantT) {
   });
   s += `\nהחזר אך ורק JSON תקין במבנה הבא, בלי טקסט נוסף ובלי סימוני קוד:
 [{"num":1,"pick":"1","confidence":"גבוהה","market":"מסכים",${reinforced ? '"reinforce":"single",' : ''}"reason":"נימוק קצר בעברית"}, ...]
-confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2".${reinforced ? ' reinforce הוא "single","double" או "triple".' : ''}`;
+confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2". reason = נימוק קצר מאוד, עד 8 מילים.${reinforced ? ' reinforce הוא "single","double" או "triple".' : ''}`;
   return s;
 }
 // סימני טור מחוזק לפי בחירת ה-AI: יחיד=הבחירה, כפול=הבחירה+הבא הכי סביר, משולש=הכל
@@ -2864,11 +2865,17 @@ function aiMarks(d, aiPick, type) {
 }
 function parseColumnResponse(txt, n) {
   let t = (txt || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim();
-  const a = t.indexOf('['), b = t.lastIndexOf(']');
-  if (a >= 0 && b > a) t = t.slice(a, b + 1);
-  const arr = JSON.parse(t);
-  if (!Array.isArray(arr)) throw new Error('תשובה לא במבנה צפוי');
-  return arr;
+  const a = t.indexOf('['); if (a >= 0) t = t.slice(a);
+  const b = t.lastIndexOf(']');
+  const whole = b > 0 ? t.slice(0, b + 1) : t;
+  // ניסיון 1: פענוח רגיל
+  try { const arr = JSON.parse(whole); if (Array.isArray(arr) && arr.length) return arr; } catch (e) {}
+  // ניסיון 2: תשובה חתוכה — מחלצים כל אובייקט { ... } שלם בנפרד
+  const objs = t.match(/\{[^{}]*\}/g) || [];
+  const out = [];
+  for (const o of objs) { try { const p = JSON.parse(o); if (p && p.num != null && p.pick) out.push(p); } catch (e) {} }
+  if (out.length) return out;
+  throw new Error('תשובת ה-AI לא הושלמה. נסה שוב.');
 }
 
 let AI_MODE = 'regular';
@@ -2912,7 +2919,7 @@ async function generateAIColumn() {
     const qNone = dossiers.filter(d => d.dataQuality === 'none' || d.dataQuality === 'basic').length;
     if (btn) btn.textContent = '🤖 ה-AI מנתח 16 משחקים...';
     const prompt = buildColumnPrompt(dossiers, reinforced, wantD, wantT);
-    const txt = await callAI(prompt, { deep: false });
+    const txt = await callAI(prompt, { deep: false, maxTokens: 4000 });
     const items = parseColumnResponse(txt, dossiers.length);
 
     const picks = {};
