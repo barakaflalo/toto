@@ -408,6 +408,16 @@ textarea{resize:none}
       <div id="form-program-info" style="font-size:10px;color:var(--text3)"></div>
       <button id="refresh-form-btn" onclick="refreshWeeklyGames(false)" style="padding:6px 12px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">🔄 רענן</button>
     </div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <button id="ai-mode-regular" onclick="setAIMode('regular')" style="flex:1;padding:7px;border-radius:8px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">טור רגיל</button>
+      <button id="ai-mode-reinforced" onclick="setAIMode('reinforced')" style="flex:1;padding:7px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)">טור מחוזק</button>
+    </div>
+    <div id="ai-reinforced-opts" style="display:none;gap:8px;margin-bottom:6px">
+      <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">כפולים ל-AI</div>
+        <input id="ai-doubles" type="number" value="3" min="0" max="16" style="width:100%;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
+      <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">משולשים ל-AI</div>
+        <input id="ai-triples" type="number" value="1" min="0" max="16" style="width:100%;padding:7px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
+    </div>
     <button id="ai-column-btn" onclick="generateAIColumn()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🤖 צור טור AI מבוסס נתונים</button>
     <div id="ai-column-result" style="margin-bottom:8px"></div>
     <button id="col-builder-btn" onclick="toggleColumnBuilder()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🎟️ מחולל טורים לפי תקציב</button>
@@ -465,7 +475,23 @@ textarea{resize:none}
     <div class="topbar-title">היסטוריה</div>
     <div id="history-count" style="font-size:11px;color:var(--text3)"></div>
   </div>
+  <div style="padding:0 16px">
+    <button onclick="showScreen('screen-performance')" style="width:100%;padding:10px;margin-bottom:8px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">📊 מסך ביצועים — איזו שיטה הכי טובה?</button>
+  </div>
   <div class="scroll-body" id="history-content"></div>
+</div>
+
+<!-- ========== PERFORMANCE / CALIBRATION SCREEN ========== -->
+<div class="screen" id="screen-performance">
+  <div class="topbar">
+    <div class="back-btn" onclick="showScreen('screen-history')">
+      <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+      חזור
+    </div>
+    <div class="topbar-title">📊 ביצועים</div>
+    <div></div>
+  </div>
+  <div class="scroll-body" id="performance-content"></div>
 </div>
 
 <!-- ========== UPDATE RESULTS SCREEN ========== -->
@@ -981,6 +1007,7 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   if (id === 'screen-history') renderHistory();
+  if (id === 'screen-performance') renderPerformance();
   if (id === 'screen-home') { updateHomeStats(); updateHomeAIStatus(); }
   if (id === 'screen-match-analysis') {
     // תמיד פותחים במסך הרשימה (לא בתוצאה של משחק קודם)
@@ -1282,6 +1309,15 @@ function analyzeForm() {
       (!AI_COLUMN.program || String(AI_COLUMN.program) === String(APP.programNumber))) {
     strategies.ai = { ...AI_COLUMN.picks };
   }
+  if (AI_COLUMN && AI_COLUMN.reinforced && AI_COLUMN.reinforced.marks &&
+      (!AI_COLUMN.program || String(AI_COLUMN.program) === String(APP.programNumber))) {
+    strategies.aiReinforced = { ...AI_COLUMN.reinforced.marks };
+  }
+  // הטור המחוזק הידני (סימנים מרובים)
+  if (APP.reinforcedColumn && APP.reinforcedColumn.marks &&
+      (!APP.reinforcedColumn.program || String(APP.reinforcedColumn.program) === String(APP.programNumber))) {
+    strategies.reinforced = { ...APP.reinforcedColumn.marks };
+  }
 
   const form = {
     id: Date.now(),
@@ -1301,6 +1337,60 @@ function analyzeForm() {
   updateHomeStats();
   renderFormResult(form);
   showScreen('screen-form-result');
+}
+
+// ===== מסך ביצועים/כיול — אילו שיטות מדייקות לאורך זמן =====
+function renderPerformance() {
+  const box = document.getElementById('performance-content');
+  if (!box) return;
+  const measured = (APP.forms || []).filter(f => f.results && f.scores);
+  if (!measured.length) {
+    box.innerHTML = `<div style="padding:24px 20px;text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">📊</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">עדיין אין נתונים למדידה</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">מסך הביצועים משווה את דיוק כל השיטות לאורך זמן.<br>שמור טפסים ובדוק תוצאות — וכאן תראה איזו שיטה הכי מדייקת: בטוח, הפתעות, מאוזן, טור AI, AI מחוזק, טור מחוזק, והבחירות שלך.</div>
+    </div>`;
+    return;
+  }
+  const agg = {};
+  measured.forEach(f => {
+    for (const k in (f.scores || {})) {
+      const s = f.scores[k];
+      if (!s || s.total == null) continue;
+      if (!agg[k]) agg[k] = { correct: 0, total: 0, forms: 0, best: 0 };
+      agg[k].correct += s.correct; agg[k].total += s.total; agg[k].forms++;
+      if (s.correct > agg[k].best) agg[k].best = s.correct;
+    }
+  });
+  const keys = Object.keys(agg).sort((a, b) => (agg[b].correct / agg[b].total) - (agg[a].correct / agg[a].total));
+  const topRate = keys.length ? agg[keys[0]].correct / agg[keys[0]].total : 0;
+  const rows = keys.map((k, idx) => {
+    const a = agg[k]; const pct = a.total ? Math.round(a.correct / a.total * 100) : 0;
+    const avg = a.forms ? (a.correct / a.forms).toFixed(1) : '0';
+    const label = (METHOD_META[k] && METHOD_META[k].label) || k;
+    const isBest = idx === 0 && a.total > 0;
+    const barColor = isBest ? 'var(--green)' : 'var(--accent2)';
+    return `<div style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${label}${isBest ? ' <span style="font-size:10px;color:var(--green)">🏆 מוביל</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--text2)">${pct}% · ממוצע ${avg}/16</div>
+      </div>
+      <div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px"></div>
+      </div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${a.correct} פגיעות מתוך ${a.total} · ${a.forms} טפסים · שיא ${a.best}/16</div>
+    </div>`;
+  }).join('');
+  box.innerHTML = `<div style="padding:4px 2px">
+    <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+      <div style="font-size:12px;color:var(--text2)">נמדדו</div>
+      <div style="font-size:26px;font-weight:800;color:var(--accent)">${measured.length} מחזורים</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:2px">השיטה המובילה: ${(METHOD_META[keys[0]]?.label)||keys[0]} · ${Math.round(topRate*100)}%</div>
+    </div>
+    <div class="section-lbl">דירוג השיטות לפי דיוק</div>
+    <div class="card">${rows}</div>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px;line-height:1.6">האחוז מחושב מסך הפגיעות חלקי סך המשחקים שנמדדו.<br>טורים מחוזקים (כפול/משולש) נחשבים פגיעה אם התוצאה באחד הסימנים.</div>
+  </div>`;
 }
 
 function renderHistory() {
@@ -1403,7 +1493,13 @@ function renderAllStrategyRows(f) {
     if (!obj) return '';
     const arr = colFor(obj);
     const cells = arr.map((v, k) => {
-      // אם יש תוצאות — מסמן נכון/לא נכון
+      if (Array.isArray(v)) {
+        // טור מחוזק: כמה סימנים למשחק; נכון אם התוצאה באחד מהם
+        const hit = results && results[k] && v.includes(results[k]);
+        const inner = v.map(m => `<span style="color:${pc(m)}">${m}</span>`).join('');
+        let ring = (results && results[k]) ? (hit ? 'box-shadow:0 0 0 1.5px var(--green)' : 'opacity:0.45') : '';
+        return `<div style="min-width:20px;height:20px;padding:0 3px;border-radius:4px;background:var(--bg3);display:flex;align-items:center;justify-content:center;gap:2px;font-size:9px;font-weight:700;${ring}">${inner}</div>`;
+      }
       let ring = '';
       if (results && results[k] && v !== '-') {
         ring = results[k] === v ? 'box-shadow:0 0 0 1.5px var(--green)' : 'opacity:0.45';
@@ -1424,6 +1520,8 @@ function renderAllStrategyRows(f) {
   html += makeRow('⚡ הפתעות', S.surprise, sc.surprise);
   html += makeRow('⚖️ מאוזן', S.bold, sc.bold);
   html += makeRow('🤖 טור AI', S.ai, sc.ai);
+  html += makeRow('🤖 AI מחוזק', S.aiReinforced, sc.aiReinforced);
+  html += makeRow('🎟️ טור מחוזק', S.reinforced, sc.reinforced);
   html += makeRow('✓ הבחירות שלך', f.manual || f.picks, sc.manual);
   if (results) html += '<div style="font-size:9px;color:var(--text3);text-align:center;margin-top:4px">מסגרת ירוקה = ניחוש נכון</div>';
   html += '</div>';
@@ -1599,6 +1697,8 @@ function computeFormScores(form, results) {
     surprise: form.strategies?.surprise,
     bold: form.strategies?.bold,
     ai: form.strategies?.ai,
+    aiReinforced: form.strategies?.aiReinforced,
+    reinforced: form.strategies?.reinforced,
     manual: form.manual || form.picks,
   };
   const out = {};
@@ -1606,18 +1706,24 @@ function computeFormScores(form, results) {
     const picks = methods[k];
     if (!picks || !Object.keys(picks).length) { out[k] = null; continue; }
     let correct = 0;
-    Object.keys(results).forEach(i => { if (picks[i] === results[i]) correct++; });
+    Object.keys(results).forEach(i => {
+      const pk = picks[i];
+      if (Array.isArray(pk)) { if (pk.includes(results[i])) correct++; }
+      else if (pk === results[i]) correct++;
+    });
     out[k] = { correct, total };
   }
   return out;
 }
 
 const METHOD_META = {
-  safe:     { label: '🛡️ בטוח',        picks: f => f.strategies?.safe },
-  surprise: { label: '⚡ הפתעות',       picks: f => f.strategies?.surprise },
-  bold:     { label: '⚖️ מאוזן',        picks: f => f.strategies?.bold },
-  ai:       { label: '🤖 טור AI',       picks: f => f.strategies?.ai },
-  manual:   { label: '✓ הבחירות שלך',   picks: f => (f.manual || f.picks) },
+  safe:         { label: '🛡️ בטוח',        picks: f => f.strategies?.safe },
+  surprise:     { label: '⚡ הפתעות',       picks: f => f.strategies?.surprise },
+  bold:         { label: '⚖️ מאוזן',        picks: f => f.strategies?.bold },
+  ai:           { label: '🤖 טור AI',       picks: f => f.strategies?.ai },
+  aiReinforced: { label: '🤖 AI מחוזק',     picks: f => f.strategies?.aiReinforced },
+  reinforced:   { label: '🎟️ טור מחוזק',    picks: f => f.strategies?.reinforced },
+  manual:       { label: '✓ הבחירות שלך',   picks: f => (f.manual || f.picks) },
 };
 
 function renderResultsPreview(form, results, found, pending) {
@@ -1704,6 +1810,8 @@ function saveResults(formIdx) {
     manual: sc.manual || { correct: 0, total: tot },
   };
   if (sc.ai) form.scores.ai = sc.ai;
+  if (sc.aiReinforced) form.scores.aiReinforced = sc.aiReinforced;
+  if (sc.reinforced) form.scores.reinforced = sc.reinforced;
   // השיטה המנצחת (מבין השיטות שיש בהן ניחושים)
   const ranked = Object.keys(sc).filter(k => sc[k]).sort((a,b) => sc[b].correct - sc[a].correct);
   form.best = ranked.length ? { method: ranked[0], correct: sc[ranked[0]].correct, total: sc[ranked[0]].total } : null;
@@ -2576,8 +2684,8 @@ function toggleKeyVisibility() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
-// ===== מחולל טורים לפי תקציב (כפולים/משולשים) =====
-let COL_STATE = null; // {type:{i:'single'|'double'|'triple'}, price, budget}
+// ===== מחולל טורים לפי מספר כפולים/משולשים =====
+let COL_STATE = null; // {type:{i:'single'|'double'|'triple'}, wantD, wantT}
 
 function colFactor(t) { return t === 'triple' ? 3 : t === 'double' ? 2 : 1; }
 function colCount(type) { let c = 1; for (const k in type) c *= colFactor(type[k]); return c; }
@@ -2605,23 +2713,13 @@ function marksFor(g, t) {
   if (t === 'double') return order.slice(0, 2);
   return [order[0]];
 }
-
-function suggestColumns(games, maxCols) {
+// ממקם wantT משולשים ו-wantD כפולים במשחקים הצמודים ביותר. מחזיר map של type.
+function placeReinforcements(games, wantD, wantT) {
   const type = {}; games.forEach((g, i) => type[i] = 'single');
-  const unc = games.map((g, i) => ({ i, u: gameUncertainty(g) })).sort((a, b) => b.u - a.u);
-  // שלב 1: משדרג את הצמודים ביותר לכפול (כל עוד בתקציב)
-  for (const c of unc) {
-    if (c.u < 0.30) break;
-    const cand = Object.assign({}, type, { [c.i]: 'double' });
-    if (colCount(cand) <= maxCols) type[c.i] = 'double';
-  }
-  // שלב 2: את הצמודים במיוחד משדרג למשולש
-  for (const c of unc) {
-    if (c.u < 0.55) break;
-    if (type[c.i] !== 'double') continue;
-    const cand = Object.assign({}, type, { [c.i]: 'triple' });
-    if (colCount(cand) <= maxCols) type[c.i] = 'triple';
-  }
+  const order = games.map((g, i) => ({ i, u: gameUncertainty(g) })).sort((a, b) => b.u - a.u);
+  let pos = 0;
+  for (let k = 0; k < wantT && pos < order.length; k++, pos++) type[order[pos].i] = 'triple';
+  for (let k = 0; k < wantD && pos < order.length; k++, pos++) type[order[pos].i] = 'double';
   return type;
 }
 
@@ -2631,16 +2729,16 @@ function toggleColumnBuilder() {
   if (box.style.display === 'none') {
     if (!APP.currentGames || !APP.currentGames.length) { toast('טען קודם את משחקי השבוע', 'i'); return; }
     box.style.display = 'block';
-    if (!COL_STATE) COL_STATE = { type: null, price: 1, budget: 36 };
+    if (!COL_STATE) COL_STATE = { type: null, wantD: 3, wantT: 1 };
     renderColumnBuilder();
   } else { box.style.display = 'none'; }
 }
 
 function generateColumnSuggestion() {
-  const budget = Math.max(1, Number(document.getElementById('col-budget')?.value) || 36);
-  const price = Math.max(0.1, Number(document.getElementById('col-price')?.value) || 1);
-  const maxCols = Math.floor(budget / price);
-  COL_STATE = { type: suggestColumns(APP.currentGames, maxCols), price, budget };
+  const wantD = Math.max(0, Math.min(16, Number(document.getElementById('col-doubles')?.value) || 0));
+  const wantT = Math.max(0, Math.min(16, Number(document.getElementById('col-triples')?.value) || 0));
+  if (wantD + wantT > APP.currentGames.length) { toast('יותר מדי כפולים+משולשים', 'i'); return; }
+  COL_STATE = { type: placeReinforcements(APP.currentGames, wantD, wantT), wantD, wantT };
   renderColumnBuilder();
 }
 
@@ -2651,29 +2749,41 @@ function cycleGameType(i) {
   renderColumnBuilder();
 }
 
+// שומר את הטור המחוזק כשיטה בטופס (מבנה: לכל משחק הסימן הראשי, כמו שאר השיטות)
+function saveReinforcedColumn() {
+  if (!COL_STATE || !COL_STATE.type) { toast('צור טור קודם', 'i'); return; }
+  const picks = {}, marks = {};
+  APP.currentGames.forEach((g, i) => {
+    const t = COL_STATE.type[i] || 'single';
+    const m = marksFor(g, t);
+    picks[i] = m[0];        // הסימן הראשי (להשוואת דיוק)
+    marks[i] = m;           // כל הסימנים (לתצוגת הטור)
+  });
+  APP.reinforcedColumn = { picks, marks, type: { ...COL_STATE.type }, program: APP.programNumber || '' };
+  toast('✅ הטור המחוזק יישמר עם הטופס', 's');
+}
+
 function renderColumnBuilder() {
   const box = document.getElementById('column-builder');
   if (!box) return;
-  const price = COL_STATE?.price ?? 1;
-  const budget = COL_STATE?.budget ?? 36;
+  const wantD = COL_STATE?.wantD ?? 3;
+  const wantT = COL_STATE?.wantT ?? 1;
   const type = COL_STATE?.type;
   const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':'var(--red)';
   const pb = v => v==='1'?'var(--green-bg)':v==='X'?'var(--amber-bg)':'var(--red-bg)';
 
   let inputs = `<div style="display:flex;gap:8px;margin-bottom:8px">
-    <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">תקציב (₪)</div>
-      <input id="col-budget" type="number" value="${budget}" min="1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
-    <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">מחיר לטור (₪)</div>
-      <input id="col-price" type="number" value="${price}" min="0.1" step="0.1" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
+    <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">כמה כפולים</div>
+      <input id="col-doubles" type="number" value="${wantD}" min="0" max="16" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
+    <div style="flex:1"><div style="font-size:10px;color:var(--text2);margin-bottom:3px">כמה משולשים</div>
+      <input id="col-triples" type="number" value="${wantT}" min="0" max="16" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border2);background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box"></div>
   </div>
   <button onclick="generateColumnSuggestion()" class="btn-gold" style="width:100%;padding:9px;margin-bottom:8px">✨ צור הצעה אוטומטית</button>`;
 
   let body = '';
   if (type) {
     const cols = colCount(type);
-    const cost = cols * price;
     let d = 0, t = 0; for (const k in type) { if (type[k] === 'double') d++; else if (type[k] === 'triple') t++; }
-    const over = cost > budget;
     const rows = APP.currentGames.map((g, i) => {
       const tt = type[i] || 'single';
       const marks = marksFor(g, tt);
@@ -2686,13 +2796,13 @@ function renderColumnBuilder() {
         <div style="display:flex;gap:3px">${cells}</div>
       </div>`;
     }).join('');
-    body = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:${over?'var(--red-bg)':'var(--accent-bg)'};border:1px solid ${over?'var(--red-border)':'var(--accent2)'};border-radius:8px;margin-bottom:8px">
+    body = `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--accent-bg);border:1px solid var(--accent2);border-radius:8px;margin-bottom:8px">
         <div style="font-size:11px;color:var(--text2)">${d} כפולים · ${t} משולשים</div>
-        <div style="text-align:left"><div style="font-size:14px;font-weight:800;color:${over?'var(--red)':'var(--accent)'}">${cols} טורים · ₪${cost.toFixed(0)}</div>
-        ${over?'<div style="font-size:9px;color:var(--red)">חורג מהתקציב</div>':'<div style="font-size:9px;color:var(--text3)">בתוך התקציב</div>'}</div>
+        <div style="font-size:15px;font-weight:800;color:var(--accent)">${cols} טורים</div>
       </div>
-      <div style="font-size:9px;color:var(--text3);margin-bottom:6px">לחיצה על משחק מחליפה יחיד → כפול → משולש. ההצעה ממקדת כפולים/משולשים במשחקים הצמודים ביותר.</div>
-      ${rows}`;
+      <div style="font-size:9px;color:var(--text3);margin-bottom:6px">לחיצה על משחק מחליפה יחיד → כפול → משולש. ההצעה ממקדת את הכפולים/משולשים במשחקים הצמודים ביותר.</div>
+      ${rows}
+      <button onclick="saveReinforcedColumn()" class="btn-gold" style="width:100%;margin-top:8px;padding:10px">💾 שמור טור מחוזק (יישמר עם הטופס)</button>`;
   }
   box.innerHTML = `<div class="card" style="border-color:var(--border2)">
     <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">🎟️ מחולל טורים</div>
@@ -2707,7 +2817,7 @@ function fmtRecord(r) {
   if (!r || !r.played) return 'אין נתונים';
   return `${r.form ? r.form.join('') : ''} · ${r.w}נ ${r.d}ת ${r.l}ה · ממוצע שערים ${r.gfAvg}-${r.gaAvg}`;
 }
-function buildColumnPrompt(dossiers) {
+function buildColumnPrompt(dossiers, reinforced, wantD, wantT) {
   let s = `אתה אנליסט כדורגל מקצועי. לפניך ${dossiers.length} משחקים מטופס טוטו 16, כל אחד עם נתוני כושר אמיתיים שחושבו מתוצאות עבר.
 המשימה: לכל משחק, בחר 1 (ניצחון בית), X (תיקו) או 2 (ניצחון חוץ), עם רמת ביטחון ונימוק קצר.
 
@@ -2715,9 +2825,17 @@ function buildColumnPrompt(dossiers) {
 • התבסס אך ורק על הנתונים שמסופקים כאן. אל תמציא פציעות/הרכבים/נתונים שלא ניתנו.
 • אם איכות הנתונים היא "none" או "basic" — כתוב בנימוק "מעט נתונים" ותן ביטחון נמוך.
 • ציין אם אתה מסכים עם הפייבוריט של השוק (היחסים) או חולק עליו.
-
-הנתונים:
 `;
+  if (reinforced) {
+    s += `
+זהו טור מחוזק. בנוסף לבחירה הראשית, סמן בשדה "reinforce":
+• "triple" ל-${wantT} המשחקים הכי לא-ודאיים (שם כדאי לכסות את כל 1/X/2).
+• "double" ל-${wantD} המשחקים הבאים בחוסר-ודאות (כיסוי 2 תוצאות).
+• "single" לכל השאר.
+בחר את המשחקים לחיזוק לפי הידע והסטטיסטיקה — לא רק לפי היחסים. סה"כ בדיוק ${wantT} משולשים ו-${wantD} כפולים.
+`;
+  }
+  s += `\nהנתונים:\n`;
   dossiers.forEach((d, i) => {
     const num = i + 1;
     const odds = d.odds ? `1:${d.odds['1']} X:${d.odds['X']} 2:${d.odds['2']}` : 'אין יחסים';
@@ -2730,9 +2848,19 @@ function buildColumnPrompt(dossiers) {
 יחסי שוק: ${odds} | איכות נתונים: ${d.dataQuality}\n`;
   });
   s += `\nהחזר אך ורק JSON תקין במבנה הבא, בלי טקסט נוסף ובלי סימוני קוד:
-[{"num":1,"pick":"1","confidence":"גבוהה","market":"מסכים","reason":"נימוק קצר בעברית"}, ...]
-confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2".`;
+[{"num":1,"pick":"1","confidence":"גבוהה","market":"מסכים",${reinforced ? '"reinforce":"single",' : ''}"reason":"נימוק קצר בעברית"}, ...]
+confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2".${reinforced ? ' reinforce הוא "single","double" או "triple".' : ''}`;
   return s;
+}
+// סימני טור מחוזק לפי בחירת ה-AI: יחיד=הבחירה, כפול=הבחירה+הבא הכי סביר, משולש=הכל
+function aiMarks(d, aiPick, type) {
+  if (type === 'triple') return ['1', 'X', '2'];
+  if (type === 'double') {
+    const p = gameProbs(d) || { '1': 34, 'X': 33, '2': 33 };
+    const other = ['1', 'X', '2'].filter(x => x !== aiPick).sort((a, b) => p[b] - p[a])[0];
+    return [aiPick, other];
+  }
+  return [aiPick];
 }
 function parseColumnResponse(txt, n) {
   let t = (txt || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -2743,8 +2871,24 @@ function parseColumnResponse(txt, n) {
   return arr;
 }
 
+let AI_MODE = 'regular';
+function setAIMode(m) {
+  AI_MODE = m;
+  const reg = document.getElementById('ai-mode-regular'), rein = document.getElementById('ai-mode-reinforced'), opts = document.getElementById('ai-reinforced-opts');
+  if (reg && rein) {
+    const on = 'flex:1;padding:7px;border-radius:8px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)';
+    const off = 'flex:1;padding:7px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:700;cursor:pointer;font-family:var(--font)';
+    reg.setAttribute('style', m === 'regular' ? on : off);
+    rein.setAttribute('style', m === 'reinforced' ? on : off);
+  }
+  if (opts) opts.style.display = m === 'reinforced' ? 'flex' : 'none';
+}
+
 async function generateAIColumn() {
   if (!aiIsConnected()) { showNoAI('screen-load-form'); return; }
+  const reinforced = AI_MODE === 'reinforced';
+  const wantD = reinforced ? Math.max(0, Math.min(16, Number(document.getElementById('ai-doubles')?.value) || 0)) : 0;
+  const wantT = reinforced ? Math.max(0, Math.min(16, Number(document.getElementById('ai-triples')?.value) || 0)) : 0;
   const btn = document.getElementById('ai-column-btn');
   const box = document.getElementById('ai-column-result');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ מושך נתונים...'; }
@@ -2767,14 +2911,30 @@ async function generateAIColumn() {
     const dossiers = data.games;
     const qNone = dossiers.filter(d => d.dataQuality === 'none' || d.dataQuality === 'basic').length;
     if (btn) btn.textContent = '🤖 ה-AI מנתח 16 משחקים...';
-    const prompt = buildColumnPrompt(dossiers);
+    const prompt = buildColumnPrompt(dossiers, reinforced, wantD, wantT);
     const txt = await callAI(prompt, { deep: false });
     const items = parseColumnResponse(txt, dossiers.length);
 
     const picks = {};
     items.forEach(it => { const idx = Number(it.num) - 1; if (idx >= 0 && idx < dossiers.length && /^[1X2]$/.test(it.pick)) picks[idx] = it.pick; });
-    AI_COLUMN = { picks, items, dossiers, program: (data.program || APP.programNumber || '') };
-    renderAIColumn(dossiers, items, qNone);
+    AI_COLUMN = { picks, items, dossiers, program: (data.program || APP.programNumber || ''), reinforced: null };
+
+    if (reinforced) {
+      // בונה סימני טור מחוזק מבחירת ה-AI; אם ה-AI לא סימן — מפזר לפי אי-ודאות על בחירותיו
+      const byNum = {}; items.forEach(it => byNum[Number(it.num) - 1] = it);
+      let types = {};
+      dossiers.forEach((d, i) => { const r = (byNum[i] && byNum[i].reinforce) || 'single'; types[i] = /^(single|double|triple)$/.test(r) ? r : 'single'; });
+      const gotT = Object.values(types).filter(x => x === 'triple').length;
+      const gotD = Object.values(types).filter(x => x === 'double').length;
+      if (gotT !== wantT || gotD !== wantD) {
+        // ה-AI לא עמד במכסה — מפזרים לפי אי-ודאות (על בסיס בחירות ה-AI)
+        types = placeReinforcements(dossiers, wantD, wantT);
+      }
+      const marks = {};
+      dossiers.forEach((d, i) => { marks[i] = aiMarks(d, picks[i] || (gameProbs(d) ? ['1','X','2'].sort((a,b)=>gameProbs(d)[b]-gameProbs(d)[a])[0] : '1'), types[i]); });
+      AI_COLUMN.reinforced = { marks, types, wantD, wantT };
+    }
+    renderAIColumn(dossiers, items, qNone, reinforced ? AI_COLUMN.reinforced : null);
   } catch (e) {
     if (box) box.innerHTML = `<div class="card" style="border-color:var(--red-border)"><div style="font-size:12px;color:var(--red)">שגיאת AI: ${String(e.message||e).replace(/</g,'&lt;')}</div><div style="font-size:10px;color:var(--text3);margin-top:4px">אם זה קרה בגלל מבנה התשובה — נסה שוב.</div></div>`;
   } finally {
@@ -2782,7 +2942,7 @@ async function generateAIColumn() {
   }
 }
 
-function renderAIColumn(dossiers, items, qNone) {
+function renderAIColumn(dossiers, items, qNone, reinforced) {
   const box = document.getElementById('ai-column-result');
   if (!box) return;
   const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':v==='2'?'var(--red)':'var(--text3)';
@@ -2795,19 +2955,29 @@ function renderAIColumn(dossiers, items, qNone) {
     const conf = it.confidence || '';
     const market = it.market === 'חולק' ? '<span style="color:var(--amber);font-size:9px">⚡ חולק על השוק</span>' : (it.market === 'מסכים' ? '<span style="color:var(--text3);font-size:9px">מסכים עם השוק</span>' : '');
     const qbadge = (d.dataQuality === 'none' || d.dataQuality === 'basic') ? '<span style="color:var(--text3);font-size:9px">· מעט נתונים</span>' : '';
+    let cellHtml;
+    if (reinforced && reinforced.marks && reinforced.marks[i]) {
+      const marks = reinforced.marks[i];
+      const t = reinforced.types[i];
+      const tb = t === 'triple' ? '<span style="color:var(--red);font-size:8px;font-weight:700">3×</span>' : t === 'double' ? '<span style="color:var(--amber);font-size:8px;font-weight:700">2×</span>' : '';
+      cellHtml = `<div style="display:flex;align-items:center;gap:3px">${tb}<div style="display:flex;gap:2px">${marks.map(m=>`<div style="width:20px;height:22px;border-radius:5px;background:${pb(m)};color:${pc(m)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">${m}</div>`).join('')}</div></div>`;
+    } else {
+      cellHtml = `<div style="width:24px;height:24px;border-radius:6px;background:${pb(pick)};color:${pc(pick)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">${pick}</div>`;
+    }
     rows += `<div style="padding:8px;background:var(--bg2);border-radius:8px;margin-bottom:5px">
       <div style="display:flex;align-items:center;gap:8px">
         <div style="font-size:10px;color:var(--text3);width:16px">${i+1}</div>
         <div style="flex:1;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d.home} - ${d.away}</div>
         <div style="font-size:9px;color:var(--text3)">${conf}</div>
-        <div style="width:24px;height:24px;border-radius:6px;background:${pb(pick)};color:${pc(pick)};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800">${pick}</div>
+        ${cellHtml}
       </div>
       ${it.reason ? `<div style="font-size:10px;color:var(--text2);line-height:1.5;margin-top:5px">${String(it.reason).replace(/</g,'&lt;')} ${market} ${qbadge}</div>` : ''}
     </div>`;
   });
+  const cols = reinforced ? Math.pow(2, Object.values(reinforced.types).filter(x=>x==='double').length) * Math.pow(3, Object.values(reinforced.types).filter(x=>x==='triple').length) : 1;
   box.innerHTML = `<div class="card" style="border-color:var(--accent2)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="font-size:12px;font-weight:700;color:var(--accent)">🤖 טור AI</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent)">🤖 טור AI${reinforced ? ' מחוזק · ' + cols + ' טורים' : ''}</div>
       <div style="font-size:9px;color:var(--text3)">מבוסס על נתוני כושר אמיתיים</div>
     </div>
     ${qNone ? `<div style="font-size:10px;color:var(--text3);margin-bottom:8px;line-height:1.5">⚠️ ל-${qNone} משחקים יש מעט נתונים היסטוריים כרגע — הביטחון בהם נמוך. המאגר מתמלא עם הזמן.</div>` : ''}
