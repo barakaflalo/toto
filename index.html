@@ -404,6 +404,10 @@ textarea{resize:none}
       <button onclick="applyStrategy('bold')" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--red-border);background:transparent;font-size:10px;font-weight:600;color:var(--red);cursor:pointer;font-family:var(--font)">⚖️ מאוזן</button>
       <button onclick="clearAllPicks()" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--font)">✕ נקה</button>
     </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px">
+      <div id="form-program-info" style="font-size:10px;color:var(--text3)"></div>
+      <button id="refresh-form-btn" onclick="refreshWeeklyGames(false)" style="padding:6px 12px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">🔄 רענן</button>
+    </div>
     <button id="ai-column-btn" onclick="generateAIColumn()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🤖 צור טור AI מבוסס נתונים</button>
     <div id="ai-column-result" style="margin-bottom:8px"></div>
     <div id="form-games-list" style="display:flex;flex-direction:column;gap:5px"></div>
@@ -1142,6 +1146,13 @@ function loadManualGames() {
 }
 
 function renderFormGames() {
+  const info = document.getElementById('form-program-info');
+  if (info) {
+    const oddsN = (APP.currentGames || []).filter(g => g.hasOdds).length;
+    info.textContent = (APP.programNumber ? 'מחזור ' + APP.programNumber : '') +
+      (APP.currentGames && APP.currentGames.length ? ' · ' + APP.currentGames.length + ' משחקים' : '') +
+      (APP.currentGames && APP.currentGames.length ? (oddsN ? ' · יחסים פתוחים' : ' · יחסים טרם נפתחו') : '');
+  }
   const el = document.getElementById('form-games-list');
   el.innerHTML = APP.currentGames.map((g, i) => {
     const p = APP.currentPicks[i];
@@ -2604,10 +2615,18 @@ async function generateAIColumn() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ מושך נתונים...'; }
   if (box) box.innerHTML = '';
   try {
-    const res = await fetch(CLOUDFLARE_WORKER_URL + '/?dossier=1&t=' + Date.now());
-    const data = await res.json();
+    // מנסה חי; אם אין מחזור פעיל אבל יש snapshot שמור — שולח אותו ב-POST כדי לחשב תיקים
+    let res = await fetch(CLOUDFLARE_WORKER_URL + '/?dossier=1&t=' + Date.now());
+    let data = await res.json();
+    if ((!data.games || !data.games.length) && APP.currentGames && APP.currentGames.length) {
+      const payload = { program: APP.programNumber, date: APP.programDate,
+        games: APP.currentGames.map((g, i) => ({ num: i + 1, home: g.home, away: g.away, league: g.league || '', odds: g.odds || null, probs: g.probs || null })) };
+      res = await fetch(CLOUDFLARE_WORKER_URL + '/?dossier=1&t=' + Date.now(), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      data = await res.json();
+    }
     if (!data.games || !data.games.length) {
-      if (box) box.innerHTML = `<div class="card" style="border-color:var(--amber-border)"><div style="font-size:12px;color:var(--text2)">${(data.note || 'משחקי השבוע לא זמינים כרגע').replace(/</g,'&lt;')}</div></div>`;
+      if (box) box.innerHTML = `<div class="card" style="border-color:var(--amber-border)"><div style="font-size:12px;color:var(--text2)">${(data.note || 'טען קודם את משחקי השבוע').replace(/</g,'&lt;')}</div></div>`;
       return;
     }
     const dossiers = data.games;
@@ -2720,6 +2739,86 @@ async function aiDeepAnalysis() {
 }
 
 // מושך את משחקי השבוע מהשרת, שומר ל-APP + localStorage. מחזיר את מערך המשחקים.
+// טוען snapshot שמור (אם יש) ל-APP בלי רשת
+function loadSavedGames() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('winner-games') || 'null');
+    if (saved && Array.isArray(saved.games) && saved.games.length) {
+      APP.currentGames = saved.games;
+      APP.programNumber = saved.program || '';
+      APP.programDate = saved.date || '';
+      return saved;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function friendlyLoadError(e) {
+  const m = String((e && e.message) || e);
+  if (/no source|500|לא התקבלו/.test(m)) return 'אין כרגע מחזור פעיל — נסה שוב כשהטופס הבא ייפתח';
+  return 'שגיאה בטעינה: ' + m;
+}
+
+async function loadWeeklyGames() {
+  const btn = document.getElementById('load-weekly-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען משחקים...'; }
+  const saved = loadSavedGames();
+  try {
+    if (saved) {
+      // cache-first: מציג מיד את המחזור השמור
+      APP.currentPicks = APP.currentPicks || {};
+      renderFormGames();
+      showScreen('screen-fill-form');
+      toast('מציג מחזור שמור' + (saved.program ? ' (' + saved.program + ')' : '') + ' · מרענן...', 'info');
+      refreshWeeklyGames(true);      // רענון ברקע
+    } else {
+      // אין שמור — חייבים רשת
+      await fetchAndStoreGames();
+      APP.currentPicks = {};
+      renderFormGames();
+      showScreen('screen-fill-form');
+      const oddsN = APP.currentGames.filter(g => g.hasOdds).length;
+      let msg = '✅ ' + APP.currentGames.length + ' משחקים נטענו' + (APP.programNumber ? ' (מחזור ' + APP.programNumber + ')' : '');
+      if (oddsN === 0) msg += ' — יחסים טרם נפתחו, מלא ידנית';
+      toast(msg, oddsN === 0 ? 'info' : 'success');
+    }
+  } catch (e) {
+    console.error('Load Error:', e);
+    toast(friendlyLoadError(e), 'info');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🌐 טען טופס שבועי אוטומטית'; }
+  }
+}
+
+// רענון מול השרת: מחזור חדש → מחליף ומודיע; אותו מחזור → מרענן יחסים; כשל → שומר על השמור בשקט.
+async function refreshWeeklyGames(silent) {
+  const before = APP.programNumber;
+  const prevPicks = APP.currentPicks || {};
+  const rbtn = document.getElementById('refresh-form-btn');
+  if (rbtn) { rbtn.disabled = true; rbtn.textContent = '⏳'; }
+  try {
+    await fetchAndStoreGames();       // מעדכן APP.currentGames + program (או זורק)
+    const now = APP.programNumber;
+    if (before && now && String(now) !== String(before)) {
+      APP.currentPicks = {};          // מחזור חדש = טופס חדש, מנקה סימונים
+      renderFormGames();
+      toast('🔄 עודכן למחזור חדש (' + now + ')', 'success');
+    } else {
+      APP.currentPicks = prevPicks;   // אותו מחזור — שומר סימונים
+      renderFormGames();
+      if (!silent) {
+        const oddsN = APP.currentGames.filter(g => g.hasOdds).length;
+        toast(oddsN ? ('רועננו הנתונים · מחזור ' + (now || '')) : 'אין שינוי · יחסים טרם נפתחו', 'info');
+      }
+    }
+  } catch (e) {
+    APP.currentPicks = prevPicks;
+    if (!silent) toast('אין עדכון כרגע — מציג את המחזור השמור', 'info');
+  } finally {
+    if (rbtn) { rbtn.disabled = false; rbtn.textContent = '🔄 רענן'; }
+  }
+}
+
 async function fetchAndStoreGames() {
   const res = await fetch(CLOUDFLARE_WORKER_URL + '/?t=' + Date.now());
   if (!res.ok) throw new Error('שרת לא זמין (' + res.status + ')');
@@ -2743,26 +2842,6 @@ async function fetchAndStoreGames() {
     }));
   } catch (e) {}
   return APP.currentGames;
-}
-
-async function loadWeeklyGames() {
-  const btn = document.getElementById('load-weekly-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ טוען משחקים...'; }
-  try {
-    await fetchAndStoreGames();
-    APP.currentPicks = {};
-    renderFormGames();
-    showScreen('screen-fill-form');
-    const oddsN = APP.currentGames.filter(g => g.hasOdds).length;
-    let msg = '✅ ' + APP.currentGames.length + ' משחקים נטענו' + (APP.programNumber ? ' (מחזור ' + APP.programNumber + ')' : '');
-    if (oddsN === 0) msg += ' — יחסים טרם נפתחו, מלא ידנית';
-    toast(msg, oddsN === 0 ? 'info' : 'success');
-  } catch (e) {
-    console.error('Load Error:', e);
-    toast('שגיאה בטעינה: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🌐 טען טופס שבועי אוטומטית'; }
-  }
 }
 
 // ===== ANALYZE GAMES (REAL MATH ENGINE) =====
