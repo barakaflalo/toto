@@ -2132,8 +2132,9 @@ function renderMatchAnalysis(home, away, match, reversed) {
         <div style="flex:1"><div style="font-size:12px;font-weight:600;color:${recColor}">המלצה: ${rec}</div><div style="font-size:10px;color:var(--text2);margin-top:2px">מבוסס על יחסי הליין</div></div>
         <div style="text-align:center"><div style="font-size:9px;color:var(--text3)">ביטחון</div><div style="font-size:11px;font-weight:700;color:${confColor}">${conf}</div></div>
       </div>
-    </div><div id="match-final-result"></div>`;
+    </div><div id="match-linemove"></div><div id="match-final-result"></div>`;
     content.innerHTML = html;
+    loadLineMove(match, reversed);
     loadFinalResult(match.home, match.away, rec, reversed);
     return;
   }
@@ -2145,6 +2146,44 @@ function renderMatchAnalysis(home, away, match, reversed) {
     <div style="font-size:11px;color:var(--text3);line-height:1.5">היחסים והתחזית יופיעו כשהליין ייפתח (בדרך כלל קרוב יותר למועד המשחק). בדוק שוב מאוחר יותר.</div>
   </div>`;
   content.innerHTML = html;
+}
+
+// מושך תנועת ליין (שינויי יחסים) למשחק ומציג חיווי — יחס יורד = השוק מתחזק לאותו צד
+async function loadLineMove(match, reversed) {
+  try {
+    const prog = APP.programNumber ? '&program=' + encodeURIComponent(APP.programNumber) : '';
+    const data = await (await fetch(CLOUDFLARE_WORKER_URL + '/?linemove=1' + prog + '&t=' + Date.now())).json();
+    const box = document.getElementById('match-linemove');
+    if (!box || !data || !data.games || !data.games.length) return;
+    const nm = s => (s || '').replace(/["'׳.\-]/g, '').replace(/\s+/g, '').trim();
+    const nh = nm(match.home), na = nm(match.away);
+    let g = null;
+    if (match.num != null) g = data.games.find(x => Number(x.num) === Number(match.num));
+    if (!g) g = data.games.find(x => (nm(x.home) === nh && nm(x.away) === na) || (nm(x.home) === na && nm(x.away) === nh));
+    if (!g || g.snapshots < 2 || !g.first || !g.last) return;   // צריך לפחות 2 snapshots
+    const flip = reversed;
+    const rows = [['1', flip ? match.away : match.home], ['X', 'תיקו'], ['2', flip ? match.home : match.away]].map(([sign, label]) => {
+      const key = flip ? (sign === '1' ? '2' : sign === '2' ? '1' : 'X') : sign;
+      const f = g.first[key], l = g.last[key];
+      if (f == null || l == null) return '';
+      const d = +(l - f).toFixed(2);
+      const col = sign === '1' ? 'var(--green)' : sign === 'X' ? 'var(--amber)' : 'var(--red)';
+      let arrow = '', note = 'ללא שינוי', ncol = 'var(--text3)';
+      if (d < -0.02) { arrow = '↓'; note = 'השוק התחזק'; ncol = 'var(--green)'; }
+      else if (d > 0.02) { arrow = '↑'; note = 'השוק נחלש'; ncol = 'var(--red)'; }
+      return `<div style="display:flex;align-items:center;gap:8px;font-size:11px;padding:3px 0">
+        <div style="width:16px;font-weight:800;color:${col}">${sign}</div>
+        <div style="flex:1;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+        <div style="color:var(--text3);font-variant-numeric:tabular-nums">${f} → ${l}</div>
+        <div style="width:70px;text-align:left;color:${ncol};font-size:10px">${arrow} ${note}</div>
+      </div>`;
+    }).join('');
+    box.innerHTML = `<div class="card" style="margin-top:10px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px">📈 תנועת ליין · ${g.snapshots} מדידות</div>
+      ${rows}
+      <div style="font-size:9px;color:var(--text3);margin-top:6px;line-height:1.5">יחס שיורד = השוק מתחזק לאותו צד (יותר כסף עליו). תנועה חדה לרוב מסמנת מידע חדש.</div>
+    </div>`;
+  } catch (e) {}
 }
 
 // מושך את תוצאת הסיום מהמאגר ומציג קוביית תוצאה + ✓/✗ מול ההמלצה
