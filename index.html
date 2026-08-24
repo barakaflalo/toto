@@ -2858,6 +2858,42 @@ function fmtRecord(r) {
   if (!r || !r.played) return 'אין נתונים';
   return `${r.form ? r.form.join('') : ''} · ${r.w}נ ${r.d}ת ${r.l}ה · ממוצע שערים ${r.gfAvg}-${r.gaAvg}`;
 }
+// ===== לולאת למידה: מחשב את ביצועי ה-AI מהעבר, ומזין אותם בחזרה לפרומפט =====
+// דורש 3+ מחזורים שנמדדו (תוצאות + תחזית AI מלאה) כדי לא לכייל על מדגם זעיר ומטעה.
+function computeAICalibration() {
+  const forms = (APP.forms || []).filter(f => f.results && f.aiPrediction && f.aiPrediction.meta);
+  if (forms.length < 3) return null;
+  const overall = { n: 0, c: 0 };
+  const byConf = { 'גבוהה': { n: 0, c: 0 }, 'בינונית': { n: 0, c: 0 }, 'נמוכה': { n: 0, c: 0 } };
+  const byMarket = { 'חולק': { n: 0, c: 0 }, 'מסכים': { n: 0, c: 0 } };
+  forms.forEach(f => {
+    const meta = f.aiPrediction.meta, res = f.results;
+    for (const i in meta) {
+      const m = meta[i];
+      if (m.source !== 'ai' || res[i] == null) continue;   // רק בחירות אמיתיות של ה-AI
+      const ok = m.pick === res[i];
+      overall.n++; if (ok) overall.c++;
+      if (byConf[m.confidence]) { byConf[m.confidence].n++; if (ok) byConf[m.confidence].c++; }
+      if (byMarket[m.market]) { byMarket[m.market].n++; if (ok) byMarket[m.market].c++; }
+    }
+  });
+  if (!overall.n) return null;
+  return { measuredForms: forms.length, overall, byConf, byMarket };
+}
+function buildCalibrationText(cal) {
+  const P = o => Math.round(o.c / o.n * 100);
+  let s = `\n[דו"ח ביצועים אישי — כך דייקת בעבר, על סמך ${cal.measuredForms} מחזורים שנמדדו. קח את זה בחשבון בכיול הביטחון שלך.]\n`;
+  s += `• דיוק כללי: ${P(cal.overall)}% (${cal.overall.c}/${cal.overall.n} בחירות).\n`;
+  const c = [];
+  for (const k of ['גבוהה', 'בינונית', 'נמוכה']) { const o = cal.byConf[k]; if (o.n) c.push(`${k}: ${P(o)}% (${o.c}/${o.n})`); }
+  if (c.length) s += `• דיוק לפי רמת ביטחון — ${c.join(' · ')}.\n`;
+  const m = [];
+  for (const k of ['חולק', 'מסכים']) { const o = cal.byMarket[k]; if (o.n) m.push(`כש${k} על השוק: ${P(o)}% (${o.c}/${o.n})`); }
+  if (m.length) s += `• מול השוק — ${m.join(' · ')}.\n`;
+  s += `הפק לקחים: אם רמת ביטחון מסוימת יצאה לא-מדויקת (למשל "גבוהה" עם אחוז נמוך) — הורד ביטחון במצבים דומים. אם מחלוקת עם השוק לא השתלמה — היה זהיר יותר לפני שתחלוק.\n`;
+  return s;
+}
+
 function buildColumnPrompt(dossiers, reinforced, wantD, wantT) {
   let s = `אתה אנליסט כדורגל מקצועי. לפניך ${dossiers.length} משחקים מטופס טוטו 16, כל אחד עם נתוני כושר אמיתיים שחושבו מתוצאות עבר.
 המשימה: לכל משחק, בחר 1 (ניצחון בית), X (תיקו) או 2 (ניצחון חוץ), עם רמת ביטחון ונימוק קצר.
@@ -2867,6 +2903,8 @@ function buildColumnPrompt(dossiers, reinforced, wantD, wantT) {
 • אם איכות הנתונים היא "none" או "basic" — כתוב בנימוק "מעט נתונים" ותן ביטחון נמוך.
 • ציין אם אתה מסכים עם הפייבוריט של השוק (היחסים) או חולק עליו.
 `;
+  const cal = computeAICalibration();
+  if (cal) s += buildCalibrationText(cal);
   if (reinforced) {
     s += `
 זהו טור מחוזק. בנוסף לבחירה הראשית, סמן בשדה "reinforce":
