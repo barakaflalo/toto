@@ -1372,32 +1372,42 @@ function renderPerformance() {
   });
   const keys = Object.keys(agg).sort((a, b) => (agg[b].correct / agg[b].total) - (agg[a].correct / agg[a].total));
   const topRate = keys.length ? agg[keys[0]].correct / agg[keys[0]].total : 0;
+  const favRate = agg.favorite ? agg.favorite.correct / agg.favorite.total : null;   // קו הבנצ'מרק
   const rows = keys.map((k, idx) => {
     const a = agg[k]; const pct = a.total ? Math.round(a.correct / a.total * 100) : 0;
     const avg = a.forms ? (a.correct / a.forms).toFixed(1) : '0';
     const label = (METHOD_META[k] && METHOD_META[k].label) || k;
     const isBest = idx === 0 && a.total > 0;
-    const barColor = isBest ? 'var(--green)' : 'var(--accent2)';
-    return `<div style="margin-bottom:10px">
+    const isFav = k === 'favorite';
+    const rate = a.total ? a.correct / a.total : 0;
+    const beatsFav = favRate != null && k !== 'favorite' && rate > favRate;
+    const barColor = isFav ? 'var(--text3)' : (isBest ? 'var(--green)' : 'var(--accent2)');
+    let tag = '';
+    if (isBest && !isFav) tag = ' <span style="font-size:10px;color:var(--green)">🏆 מוביל</span>';
+    else if (beatsFav) tag = ' <span style="font-size:9px;color:var(--green)">↑ מנצח את הפייבוריט</span>';
+    else if (favRate != null && k !== 'favorite' && rate < favRate) tag = ' <span style="font-size:9px;color:var(--text3)">↓ מתחת לפייבוריט</span>';
+    return `<div style="margin-bottom:10px${isFav ? ';padding:8px;background:var(--bg3);border-radius:8px;border:1px dashed var(--border2)' : ''}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-        <div style="font-size:12px;font-weight:600;color:var(--text)">${label}${isBest ? ' <span style="font-size:10px;color:var(--green)">🏆 מוביל</span>' : ''}</div>
+        <div style="font-size:12px;font-weight:600;color:${isFav ? 'var(--text2)' : 'var(--text)'}">${label}${tag}</div>
         <div style="font-size:11px;color:var(--text2)">${pct}% · ממוצע ${avg}/16</div>
       </div>
       <div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">
         <div style="height:100%;width:${pct}%;background:${barColor};border-radius:4px"></div>
       </div>
-      <div style="font-size:9px;color:var(--text3);margin-top:2px">${a.correct} פגיעות מתוך ${a.total} · ${a.forms} טפסים · שיא ${a.best}/16</div>
+      <div style="font-size:9px;color:var(--text3);margin-top:2px">${a.correct} פגיעות מתוך ${a.total} · ${a.forms} טפסים · שיא ${a.best}/16${isFav ? ' · זה הרף להשוואה' : ''}</div>
     </div>`;
   }).join('');
+  const beatCount = favRate != null ? keys.filter(k => k !== 'favorite' && (agg[k].correct / agg[k].total) > favRate).length : 0;
   box.innerHTML = `<div style="padding:4px 2px">
     <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
       <div style="font-size:12px;color:var(--text2)">נמדדו</div>
       <div style="font-size:26px;font-weight:800;color:var(--accent)">${measured.length} מחזורים</div>
       <div style="font-size:11px;color:var(--text3);margin-top:2px">השיטה המובילה: ${(METHOD_META[keys[0]]?.label)||keys[0]} · ${Math.round(topRate*100)}%</div>
+      ${favRate != null ? `<div style="font-size:10px;color:${beatCount ? 'var(--green)' : 'var(--text3)'};margin-top:6px">${beatCount ? (beatCount + ' שיטות מנצחות את "תמיד פייבוריט" (' + Math.round(favRate*100) + '%)') : 'אף שיטה עדיין לא עוברת את הפייבוריט (' + Math.round(favRate*100) + '%)'}</div>` : ''}
     </div>
     <div class="section-lbl">דירוג השיטות לפי דיוק</div>
     <div class="card">${rows}</div>
-    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px;line-height:1.6">האחוז מחושב מסך הפגיעות חלקי סך המשחקים שנמדדו.<br>טורים מחוזקים (כפול/משולש) נחשבים פגיעה אם התוצאה באחד הסימנים.</div>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px;line-height:1.6">🎯 "פייבוריט" = תמיד הצד עם היחס הנמוך. זה הרף: שיטה ששווה ערך אמיתי צריכה <b>לנצח</b> אותו לאורך זמן.<br>טורים מחוזקים נחשבים פגיעה אם התוצאה באחד הסימנים.</div>
   </div>`;
 }
 
@@ -1531,6 +1541,7 @@ function renderAllStrategyRows(f) {
   html += makeRow('🤖 AI מחוזק', S.aiReinforced, sc.aiReinforced);
   html += makeRow('🎟️ טור מחוזק', S.reinforced, sc.reinforced);
   html += makeRow('✓ הבחירות שלך', f.manual || f.picks, sc.manual);
+  html += makeRow('🎯 פייבוריט (בנצ׳מרק)', favoritePicks(f.games), sc.favorite);
   if (results) html += '<div style="font-size:9px;color:var(--text3);text-align:center;margin-top:4px">מסגרת ירוקה = ניחוש נכון</div>';
   html += '</div>';
   return html;
@@ -1697,6 +1708,21 @@ function ensureStrategies(form) {
   });
 }
 
+// בחירות "פייבוריט בלבד" — הבנצ'מרק: תמיד הצד עם היחס הנמוך (ההסתברות הגבוהה)
+function favoritePicks(games) {
+  const picks = {};
+  (games || []).forEach((g, i) => {
+    let sign = null;
+    if (g.odds && Number(g.odds['1']) > 1) {
+      const o = g.odds; sign = ['1', 'X', '2'].sort((a, b) => Number(o[a]) - Number(o[b]))[0];
+    } else if (g.probs && g.probs['1'] != null) {
+      const p = g.probs; sign = ['1', 'X', '2'].sort((a, b) => p[b] - p[a])[0];
+    }
+    if (sign) picks[i] = sign;
+  });
+  return picks;
+}
+
 // מחשב ציון לכל שיטה מול התוצאות. מחזיר {method:{correct,total}} רק לשיטות שיש בהן ניחושים
 function computeFormScores(form, results) {
   const total = Object.keys(results).length;
@@ -1708,6 +1734,7 @@ function computeFormScores(form, results) {
     aiReinforced: form.strategies?.aiReinforced,
     reinforced: form.strategies?.reinforced,
     manual: form.manual || form.picks,
+    favorite: favoritePicks(form.games),   // בנצ'מרק — פייבוריט בלבד
   };
   const out = {};
   for (const k in methods) {
@@ -1732,6 +1759,7 @@ const METHOD_META = {
   aiReinforced: { label: '🤖 AI מחוזק',     picks: f => f.strategies?.aiReinforced },
   reinforced:   { label: '🎟️ טור מחוזק',    picks: f => f.strategies?.reinforced },
   manual:       { label: '✓ הבחירות שלך',   picks: f => (f.manual || f.picks) },
+  favorite:     { label: '🎯 פייבוריט (בנצ׳מרק)', picks: f => favoritePicks(f.games) },
 };
 
 function renderResultsPreview(form, results, found, pending) {
@@ -1818,6 +1846,7 @@ function saveResults(formIdx) {
     manual: sc.manual || { correct: 0, total: tot },
   };
   if (sc.ai) form.scores.ai = sc.ai;
+  if (sc.favorite) form.scores.favorite = sc.favorite;
   if (sc.aiReinforced) form.scores.aiReinforced = sc.aiReinforced;
   if (sc.reinforced) form.scores.reinforced = sc.reinforced;
   // השיטה המנצחת (מבין השיטות שיש בהן ניחושים)
