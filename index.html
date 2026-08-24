@@ -1308,6 +1308,14 @@ function analyzeForm() {
   if (AI_COLUMN && AI_COLUMN.picks && Object.keys(AI_COLUMN.picks).length &&
       (!AI_COLUMN.program || String(AI_COLUMN.program) === String(APP.programNumber))) {
     strategies.ai = { ...AI_COLUMN.picks };
+    // שמירת תחזית מלאה (ללמידה עתידית): נימוק, ביטחון, מקור, יחסים, זמן
+    form.aiPrediction = {
+      meta: AI_COLUMN.meta || {},
+      aiCount: AI_COLUMN.aiCount || 0,
+      autoCount: AI_COLUMN.autoCount || 0,
+      model: AI_COLUMN.model || '',
+      timestamp: AI_COLUMN.timestamp || Date.now()
+    };
   }
   if (AI_COLUMN && AI_COLUMN.reinforced && AI_COLUMN.reinforced.marks &&
       (!AI_COLUMN.program || String(AI_COLUMN.program) === String(APP.programNumber))) {
@@ -2955,8 +2963,39 @@ async function generateAIColumn() {
     const items = parseColumnResponse(txt, dossiers.length);
 
     const picks = {};
-    items.forEach(it => { const idx = Number(it.num) - 1; if (idx >= 0 && idx < dossiers.length && /^[1X2]$/.test(it.pick)) picks[idx] = it.pick; });
-    AI_COLUMN = { picks, items, dossiers, program: (data.program || APP.programNumber || ''), reinforced: null };
+    const meta = {};                 // רשומת תחזית מלאה לכל משחק (ללמידה עתידית)
+    let aiCount = 0, autoCount = 0;   // שקיפות: כמה באמת מה-AI מול הושלמו אוטומטית
+    const byNumItem = {}; items.forEach(it => { const idx = Number(it.num) - 1; if (idx >= 0 && idx < dossiers.length) byNumItem[idx] = it; });
+    dossiers.forEach((d, i) => {
+      const it = byNumItem[i];
+      let pick = (it && /^[1X2]$/.test(it.pick)) ? it.pick : null;
+      let source = 'ai';
+      if (!pick) {
+        // ה-AI לא ענה על המשחק הזה (למשל נחתך) — משלימים מהפייבוריט של השוק, ומסמנים
+        const p = gameProbs(d);
+        pick = p ? ['1', 'X', '2'].sort((a, b) => p[b] - p[a])[0] : null;
+        source = 'auto';
+      }
+      if (pick) {
+        picks[i] = pick;
+        if (source === 'ai') aiCount++; else autoCount++;
+        meta[i] = {
+          pick, source,
+          confidence: (it && it.confidence) || '',
+          reason: (it && it.reason) || (source === 'auto' ? 'הושלם אוטומטית מהשוק' : ''),
+          market: (it && it.market) || '',
+          dataQuality: d.dataQuality || 'none',
+          odds: d.odds || null,
+          home: d.home, away: d.away
+        };
+      }
+    });
+    AI_COLUMN = {
+      picks, meta, aiCount, autoCount,
+      model: (localStorage.getItem('winner-ai-provider') || localStorage.getItem('winner-model-openai') || ''),
+      timestamp: Date.now(),
+      items, dossiers, program: (data.program || APP.programNumber || ''), reinforced: null
+    };
 
     if (reinforced) {
       // בונה סימני טור מחוזק מבחירת ה-AI; אם ה-AI לא סימן — מפזר לפי אי-ודאות על בחירותיו
@@ -2990,8 +3029,9 @@ function renderAIColumn(dossiers, items, qNone, reinforced) {
   let rows = '';
   dossiers.forEach((d, i) => {
     const it = byNum[i + 1] || {};
-    const pick = /^[1X2]$/.test(it.pick) ? it.pick : '?';
-    const conf = it.confidence || '';
+    const isAuto = AI_COLUMN && AI_COLUMN.meta && AI_COLUMN.meta[i] && AI_COLUMN.meta[i].source === 'auto';
+    const pick = /^[1X2]$/.test(it.pick) ? it.pick : (AI_COLUMN && AI_COLUMN.picks && AI_COLUMN.picks[i]) || '?';
+    const conf = isAuto ? '<span style="color:var(--amber);font-size:9px;font-weight:700">שוק</span>' : (it.confidence || '');
     const market = it.market === 'חולק' ? '<span style="color:var(--amber);font-size:9px">⚡ חולק על השוק</span>' : (it.market === 'מסכים' ? '<span style="color:var(--text3);font-size:9px">מסכים עם השוק</span>' : '');
     const qbadge = (d.dataQuality === 'none' || d.dataQuality === 'basic') ? '<span style="color:var(--text3);font-size:9px">· מעט נתונים</span>' : '';
     let cellHtml;
@@ -3019,6 +3059,7 @@ function renderAIColumn(dossiers, items, qNone, reinforced) {
       <div style="font-size:12px;font-weight:700;color:var(--accent)">🤖 טור AI${reinforced ? ' מחוזק · ' + cols + ' טורים' : ''}</div>
       <div style="font-size:9px;color:var(--text3)">מבוסס על נתוני כושר אמיתיים</div>
     </div>
+    ${(AI_COLUMN && AI_COLUMN.autoCount) ? `<div style="font-size:10px;color:var(--amber);margin-bottom:8px;line-height:1.5;background:var(--amber-bg);border-radius:8px;padding:7px 9px">ℹ️ ${AI_COLUMN.aiCount}/${dossiers.length} מהמשחקים נותחו ע"י ה-AI · ${AI_COLUMN.autoCount} הושלמו אוטומטית מהשוק. התוצאה נשמרת עם הפירוט הזה למדידה כנה.</div>` : ''}
     ${qNone ? `<div style="font-size:10px;color:var(--text3);margin-bottom:8px;line-height:1.5">⚠️ ל-${qNone} משחקים יש מעט נתונים היסטוריים כרגע — הביטחון בהם נמוך. המאגר מתמלא עם הזמן.</div>` : ''}
     ${rows}
     <button onclick="applyAIColumnPicks()" class="btn-gold" style="width:100%;margin-top:8px;padding:10px">✓ החל את בחירות ה-AI על הטופס</button>
