@@ -1305,11 +1305,12 @@ function analyzeForm() {
     strategies[type] = picks;
   });
   // טור ה-AI (אם נוצר עבור המחזור הזה) — נשמר כשיטה נוספת להשוואה
+  let aiPredictionData = null;
   if (AI_COLUMN && AI_COLUMN.picks && Object.keys(AI_COLUMN.picks).length &&
       (!AI_COLUMN.program || String(AI_COLUMN.program) === String(APP.programNumber))) {
     strategies.ai = { ...AI_COLUMN.picks };
     // שמירת תחזית מלאה (ללמידה עתידית): נימוק, ביטחון, מקור, יחסים, זמן
-    form.aiPrediction = {
+    aiPredictionData = {
       meta: AI_COLUMN.meta || {},
       aiCount: AI_COLUMN.aiCount || 0,
       autoCount: AI_COLUMN.autoCount || 0,
@@ -1340,6 +1341,7 @@ function analyzeForm() {
     scores: null,                       // תוצאות אמיתיות לכשיתעדכנו
     score: null
   };
+  if (aiPredictionData) form.aiPrediction = aiPredictionData;
   APP.forms.push(form);
   localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
   updateHomeStats();
@@ -3189,14 +3191,11 @@ function applyAIColumnPicks() {
 function applyAndSaveAIColumn() {
   if (!AI_COLUMN || !AI_COLUMN.picks) { toast('אין טור AI', 'i'); return; }
   APP.currentPicks = Object.assign({}, APP.currentPicks, AI_COLUMN.picks);
+  // ודא שכל המשחקים מסומנים — משלים חוסרים מהפייבוריט (או X ברירת מחדל), כדי שהשמירה תמיד תעבוד
+  const fav = favoritePicks(APP.currentGames);
+  APP.currentGames.forEach((g, i) => { if (!APP.currentPicks[i]) APP.currentPicks[i] = fav[i] || 'X'; });
   renderFormGames();
-  if (Object.keys(APP.currentPicks).length >= APP.currentGames.length) {
-    analyzeForm();            // שומר + עובר למסך התוצאה
-  } else {
-    toast('חלק מהמשחקים חסרים בחירה — השלם ידנית ואז לחץ שמור', 'i');
-    const sb = document.getElementById('form-analyze-btn');
-    if (sb) setTimeout(() => sb.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
-  }
+  analyzeForm();              // שומר + עובר למסך התוצאה
 }
 
 // ניתוח AI מעמיק ועצמאי — חושב לבד, מחפש באינטרנט, ולא רק מקריא את הסטטיסטיקה שלנו
