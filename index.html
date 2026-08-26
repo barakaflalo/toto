@@ -2642,7 +2642,7 @@ async function callGeminiBYOK(prompt, apiKey, opts) {
     const attempts = opts.deep ? [true, false] : [false]; // עם כלים ואז בלי
     let deadModel = false;
     for (const useTools of attempts) {
-      const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.maxTokens || (opts.deep ? 2000 : 4000) };
+      const genCfg = { temperature: opts.deep ? 0.6 : 0.3, maxOutputTokens: opts.maxTokens || (opts.deep ? 4000 : 2000) };
       if (/gemini-2\.5/.test(model)) genCfg.thinkingConfig = { thinkingBudget: 0 };
       const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: genCfg };
       if (useTools) body.tools = [{ google_search: {} }];
@@ -2671,7 +2671,7 @@ async function callGeminiBYOK(prompt, apiKey, opts) {
 async function callClaudeBYOK(prompt, apiKey, opts) {
   opts = opts || {};
   if (!apiKey) throw new Error('מפתח Claude לא הוגדר');
-  const body = { model: 'claude-haiku-4-5-20251001', max_tokens: opts.maxTokens || (opts.deep ? 1800 : 2000), messages: [{ role: 'user', content: prompt }] };
+  const body = { model: 'claude-haiku-4-5-20251001', max_tokens: opts.maxTokens || (opts.deep ? 4000 : 2000), messages: [{ role: 'user', content: prompt }] };
   if (opts.deep) body.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }]; // חיפוש אינטרנט חי
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -3212,10 +3212,10 @@ async function aiDeepAnalysis() {
 4. הערכה טקטית קצרה.
 5. התחזית שלך: 1 (ניצחון בית), X (תיקו) או 2 (ניצחון חוץ), עם רמת ביטחון ונימוק.
 
-כתוב בעברית, בצורה זורמת וברורה, 6-10 משפטים. אם אתה לא בטוח בפרט מסוים — אמור זאת בכנות במקום להמציא.`;
+כתוב בעברית, בצורה זורמת, מפורטת ומעמיקה — ניתוח רציני של 12-18 משפטים המכסה את כל הסעיפים לעיל. אל תקצר. אם אתה לא בטוח בפרט מסוים — אמור זאת בכנות במקום להמציא.`;
 
   try {
-    const txt = await callAI(prompt, { deep: true });
+    const txt = await callAI(prompt, { deep: true, maxTokens: 4000 });
     const clean = (txt || '').trim();
     if (box) box.innerHTML = `<div class="card" style="border-color:var(--accent2)">
       <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px">🤖 ניתוח AI מעמיק</div>
