@@ -2996,7 +2996,7 @@ function buildColumnPrompt(dossiers, reinforced, wantD, wantT) {
   });
   s += `\nהחזר אך ורק JSON תקין במבנה הבא, בלי טקסט נוסף ובלי סימוני קוד:
 [{"num":1,"pick":"1","confidence":"גבוהה","market":"מסכים",${reinforced ? '"reinforce":"single",' : ''}"reason":"נימוק קצר בעברית"}, ...]
-confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2". reason = נימוק קצר מאוד, עד 8 מילים.${reinforced ? ' reinforce הוא "single","double" או "triple".' : ''}`;
+confidence הוא אחד מ: "גבוהה","בינונית","נמוכה". market הוא "מסכים" או "חולק". pick הוא "1","X" או "2". reason = משפט אחד קצר מאוד, עד 6 מילים. חובה לכלול את כל ${dossiers.length} המשחקים במערך אחד — אל תפרט יתר על המידה, קצר וממצה כדי שכולם ייכנסו.${reinforced ? ' reinforce הוא "single","double" או "triple".' : ''}`;
   return s;
 }
 // סימני טור מחוזק לפי בחירת ה-AI: יחיד=הבחירה, כפול=הבחירה+הבא הכי סביר, משולש=הכל
@@ -3065,7 +3065,7 @@ async function generateAIColumn() {
     const qNone = dossiers.filter(d => d.dataQuality === 'none' || d.dataQuality === 'basic').length;
     if (btn) btn.textContent = '🤖 ה-AI מנתח 16 משחקים...';
     const prompt = buildColumnPrompt(dossiers, reinforced, wantD, wantT);
-    const txt = await callAI(prompt, { deep: false, maxTokens: 4000 });
+    const txt = await callAI(prompt, { deep: false, maxTokens: 8000 });
     const items = parseColumnResponse(txt, dossiers.length);
 
     const picks = {};
@@ -3168,7 +3168,10 @@ function renderAIColumn(dossiers, items, qNone, reinforced) {
     ${(AI_COLUMN && AI_COLUMN.autoCount) ? `<div style="font-size:10px;color:var(--amber);margin-bottom:8px;line-height:1.5;background:var(--amber-bg);border-radius:8px;padding:7px 9px">ℹ️ ${AI_COLUMN.aiCount}/${dossiers.length} מהמשחקים נותחו ע"י ה-AI · ${AI_COLUMN.autoCount} הושלמו אוטומטית מהשוק. התוצאה נשמרת עם הפירוט הזה למדידה כנה.</div>` : ''}
     ${qNone ? `<div style="font-size:10px;color:var(--text3);margin-bottom:8px;line-height:1.5">⚠️ ל-${qNone} משחקים יש מעט נתונים היסטוריים כרגע — הביטחון בהם נמוך. המאגר מתמלא עם הזמן.</div>` : ''}
     ${rows}
-    <button onclick="applyAIColumnPicks()" class="btn-gold" style="width:100%;margin-top:8px;padding:10px">✓ החל את בחירות ה-AI על הטופס</button>
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="applyAIColumnPicks()" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">✓ החל על הטופס (לעריכה)</button>
+      <button onclick="applyAndSaveAIColumn()" class="btn-gold" style="flex:1;padding:10px">💾 החל ושמור טופס</button>
+    </div>
   </div>`;
 }
 
@@ -3177,7 +3180,23 @@ function applyAIColumnPicks() {
   APP.currentPicks = Object.assign({}, APP.currentPicks, AI_COLUMN.picks);
   renderFormGames();
   const n = Object.keys(AI_COLUMN.picks).length;
-  toast('✅ הוחלו ' + n + ' בחירות AI על הטופס', 's');
+  toast('✅ הוחלו ' + n + ' בחירות · עכשיו אפשר לשמור למטה', 's');
+  const sb = document.getElementById('form-analyze-btn');
+  if (sb) setTimeout(() => sb.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+}
+
+// פעולה אחת: מחיל את בחירות ה-AI ושומר מיד את הטופס (עם כל השיטות + תחזית ה-AI המלאה)
+function applyAndSaveAIColumn() {
+  if (!AI_COLUMN || !AI_COLUMN.picks) { toast('אין טור AI', 'i'); return; }
+  APP.currentPicks = Object.assign({}, APP.currentPicks, AI_COLUMN.picks);
+  renderFormGames();
+  if (Object.keys(APP.currentPicks).length >= APP.currentGames.length) {
+    analyzeForm();            // שומר + עובר למסך התוצאה
+  } else {
+    toast('חלק מהמשחקים חסרים בחירה — השלם ידנית ואז לחץ שמור', 'i');
+    const sb = document.getElementById('form-analyze-btn');
+    if (sb) setTimeout(() => sb.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+  }
 }
 
 // ניתוח AI מעמיק ועצמאי — חושב לבד, מחפש באינטרנט, ולא רק מקריא את הסטטיסטיקה שלנו
