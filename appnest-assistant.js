@@ -164,6 +164,14 @@
         if (el2) { flash(el2); return 'הנה זה — סימנתי לך בזהב.'; }
         return null;
       }
+      if (act.action === 'appAction') {
+        // פעולה ייחודית לאפליקציה — מוגדרת במפה (CFG.actions), מפעילה פונקציה של האפליקציה.
+        var custom = (CFG.actions || {})[act.target];
+        if (custom && typeof custom.run === 'function') {
+          try { custom.run(); return custom.done || 'בוצע ✓'; } catch (e) { return null; }
+        }
+        return null;
+      }
     } catch (e) { return null; }
     return null;
   }
@@ -183,6 +191,14 @@
       return '• ' + (f.label || f.name) + ': ' + (val ? '"' + val + '"' : '(ריק)');
     }).join('\n');
 
+    // מצב כללי של האפליקציה (אם האפליקציה מספקת תיאור מצב משלה)
+    var appState = '';
+    if (typeof CFG.readState === 'function') { try { appState = CFG.readState() || ''; } catch (e) {} }
+
+    // פעולות ייחודיות לאפליקציה (מעבר לניווט/כתיבה/הדגשה)
+    var customActions = CFG.actions || {};
+    var actionList = Object.keys(customActions).map(function (k) { return '"' + k + '" — ' + (customActions[k].desc || ''); }).join('\n');
+
     return [
       'אתה עוזר חכם בתוך האפליקציה "' + CFG.appName + '".',
       CFG.appDescription || '',
@@ -192,13 +208,16 @@
       '<<ACTION>>{"action":"navigate","target":"שם המסך"}<<END>>',
       '<<ACTION>>{"action":"writeField","target":"שם השדה","text":"התוכן המלא"}<<END>>',
       '<<ACTION>>{"action":"highlight","target":"טקסט הכפתור או שם השדה"}<<END>>',
+      (actionList ? '<<ACTION>>{"action":"appAction","target":"שם הפעולה"}<<END>>' : ''),
       'אם המשתמש ביקש כמה דברים ברצף (למשל "כתוב שיר ואז עבור לקולות") — החזר כמה בלוקי פעולה, כל אחד בשורה נפרדת, בסדר שבו הם צריכים להתבצע (בדרך כלל: קודם לכתוב לשדה, ורק אחר כך לנווט למסך אחר).',
       '',
       'מסכים זמינים לניווט: ' + (tabNames || '(אין)'),
       'שדות זמינים לכתיבה: ' + (fieldList || '(אין)'),
+      (actionList ? 'פעולות ייחודיות זמינות (appAction):\n' + actionList : ''),
       '',
       'התוכן שנמצא כרגע בשדות האפליקציה (כדי שתוכל להתייחס אליו — לשפר, לתרגם, לענות עליו):',
       (fieldState || '(אין שדות)'),
+      (appState ? '\nמצב האפליקציה כרגע:\n' + appState : ''),
       '',
       'כללים: דבר בעברית, טבעי וידידותי. תמיד כתוב קודם תשובה קצרה למשתמש, ורק אחריה (אם צריך) את בלוק הפעולה.',
       'אם המשתמש מבקש ליצור או לשנות תוכן (שיר, טקסט) — כתוב את התוצאה המלאה בתוך writeField, לא בגוף הצ\'אט.',

@@ -3716,11 +3716,33 @@ init();
       // אין שדות טקסט חופשיים בטוטו (הטופס הוא בחירות 1/X/2), אז הכתיבה לא רלוונטית כאן.
       fields: [],
 
+      // "עיניים" — מתאר לעוזר את מצב הטופס הנוכחי, כדי שיוכל לענות "כמה מילאתי?" וכו'.
+      readState: function () {
+        try {
+          var g = (window.APP && window.APP.currentGames) || [];
+          var picks = (window.APP && window.APP.currentPicks) || {};
+          var forms = (window.APP && window.APP.forms) || [];
+          var filled = Object.keys(picks).length;
+          if (!g.length) return 'לא טעונים משחקים בטופס כרגע. טפסים שמורים בהיסטוריה: ' + forms.length + '.';
+          return 'משחקים בטופס: ' + g.length + '. בחירות שמולאו: ' + filled + ' מתוך ' + g.length +
+                 (filled < g.length ? ' (חסרות ' + (g.length - filled) + ' בחירות).' : ' (הטופס מלא).') +
+                 ' טפסים שמורים בהיסטוריה: ' + forms.length + '.';
+        } catch (e) { return ''; }
+      },
+
+      // פעולות ייחודיות בטוחות (רק הפעלה — לא מחיקה של מידע)
+      actions: {
+        analyzeForm:   { desc: 'נתח את הטופס הנוכחי (מחשב תחזית מהליין)', done: 'הפעלתי ניתוח טופס.', run: function () { if (window.analyzeForm) window.analyzeForm(); } },
+        aiColumn:      { desc: 'צור טור AI אוטומטי לטופס', done: 'יצרתי טור AI.', run: function () { if (window.generateAIColumn) window.generateAIColumn(); } },
+        loadWeekly:    { desc: 'טען את משחקי השבוע הנוכחי', done: 'טוען את משחקי השבוע.', run: function () { if (window.loadWeeklyGames) window.loadWeeklyGames(); } },
+        analyzeWithAI: { desc: 'נתח את כל המשחקים בעזרת ה-AI', done: 'מפעיל ניתוח AI על המשחקים.', run: function () { if (window.analyzeGamesWithAI) window.analyzeGamesWithAI(); } }
+      },
+
       suggestions: [
         'מה זה טופס וינר 16?',
-        'איך מנתחים משחק?',
-        'עבור למילוי טופס',
-        'פתח את ההיסטוריה'
+        'כמה משחקים מילאתי?',
+        'נתח לי את הטופס',
+        'עבור למילוי טופס'
       ]
     };
   </script>
