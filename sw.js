@@ -1,10 +1,10 @@
 /* Winner אנליזר — Service Worker
    בכל עדכון: העלה את VERSION כדי שמשתמשים קיימים יקבלו את הגרסה החדשה אוטומטית. */
-const VERSION = 'winner-v19';
+const VERSION = 'winner-v20';
 const CACHE = 'winner-cache-' + VERSION;
 const APP_SHELL = [
   './',
-  './index.html',
+  './index.html','./appnest-assistant.js',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',

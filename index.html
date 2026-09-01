@@ -3667,5 +3667,63 @@ if ('serviceWorker' in navigator) {
 
 init();
 </script>
+  <!-- ═══════════ עוזר AppNest ═══════════
+       "המפה" של Winner אנליזר. המנוע (appnest-assistant.js) זהה לזה של
+       SunoPrep ושאר האפליקציות; רק המפה הזו מותאמת לטוטו:
+       • הטוטו שומר מפתחות אחרת (winner-key-*) → readAiConfig מותאם.
+       • הטוטו מנווט דרך showScreen() → navigate מותאם. -->
+  <script>
+    window.APPNEST_ASSISTANT_CONFIG = {
+      appName: 'Winner אנליזר',
+      appDescription:
+        'Winner אנליזר הוא כלי לניתוח טפסי טוטו וינר 16: ממלאים 16 משחקים (בחירת 1/X/2 לכל אחד), ' +
+        'מנתחים כל משחק בנפרד עם AI ועם יחסי הליין, שומרים טפסים בהיסטוריה, ובודקים ביצועים אחרי הסיבוב. ' +
+        'עזור למשתמש להבין את האפליקציה, לתת טיפים על מילוי הטופס וניתוח משחקים, ולמצוא את דרכו בין המסכים. ' +
+        'שים לב: הימורים כרוכים בסיכון, ואין ערובה לזכייה — אל תיתן הבטחות, רק ניתוח וכלים.',
+
+      // הטוטו שומר את הספק והמפתחות במפתחות נפרדים (winner-*). ממירים לפורמט האחיד.
+      readAiConfig: function () {
+        var p = localStorage.getItem('winner-ai-provider') || localStorage.getItem('winner-ai') || '';
+        if (p === 'gemini-app') p = 'gemini';
+        if (['gemini', 'claude', 'openai', 'device', 'custom'].indexOf(p) === -1) return null;
+        return {
+          provider: p,
+          keys: {
+            gemini: localStorage.getItem('winner-key-gemini') || '',
+            claude: localStorage.getItem('winner-key-claude') || '',
+            openai: localStorage.getItem('winner-key-openai') || '',
+            deviceUrl: localStorage.getItem('winner-device-url') || '',
+            customUrl: localStorage.getItem('winner-custom-url') || '',
+            customKey: localStorage.getItem('winner-key-custom') || ''
+          }
+        };
+      },
+
+      // הטוטו מנווט דרך הפונקציה showScreen(id)
+      navigate: function (screenId) { if (window.showScreen) window.showScreen(screenId); },
+
+      // מסכים (שם ידידותי → מזהה המסך בקוד)
+      tabs: [
+        { name: 'בית',        screen: 'screen-home' },
+        { name: 'מילוי טופס',  screen: 'screen-load-form' },
+        { name: 'ניתוח משחק',  screen: 'screen-match-analysis' },
+        { name: 'היסטוריה',    screen: 'screen-history' },
+        { name: 'ביצועים',     screen: 'screen-performance' },
+        { name: 'חיבור AI',    screen: 'screen-ai-connect' },
+        { name: 'הגדרות',      screen: 'screen-settings' }
+      ],
+
+      // אין שדות טקסט חופשיים בטוטו (הטופס הוא בחירות 1/X/2), אז הכתיבה לא רלוונטית כאן.
+      fields: [],
+
+      suggestions: [
+        'מה זה טופס וינר 16?',
+        'איך מנתחים משחק?',
+        'עבור למילוי טופס',
+        'פתח את ההיסטוריה'
+      ]
+    };
+  </script>
+  <script src="appnest-assistant.js"></script>
 </body>
 </html>
