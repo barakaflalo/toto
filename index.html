@@ -2,6 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<script>/* Moved to its own address. Redirect ONLY from the old GitHub Pages address (same repo feeds both). */(function(){try{if(location.hostname==='barakaflalo.github.io'){var p=location.pathname.replace(/^\/[^\/]+/,'')||'/';location.replace('https://toto-app.pages.dev'+p+location.search+location.hash);}}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0a0a0a" id="theme-color-meta">
@@ -353,7 +354,7 @@ textarea{resize:none}
   <div class="app-footer">
     <span class="footer-text">© Barak Aflalo</span>
     <div class="footer-dot"></div>
-    <a href="https://barakaflalo.github.io/appnest" class="footer-link">AppNest</a>
+    <a href="https://appnest-store.pages.dev" class="footer-link">AppNest</a>
     <div class="footer-dot"></div>
     <span class="footer-text">v1.0</span>
   </div>
@@ -695,7 +696,7 @@ textarea{resize:none}
         <span style="font-size:11px;color:var(--text3)">רישיון</span><span style="font-size:11px;color:var(--text2)">© AppNest 2026</span>
       </div>
     </div>
-    <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:var(--radius-lg);padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer" onclick="openLink('https://barakaflalo.github.io/appnest')">
+    <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:var(--radius-lg);padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;cursor:pointer" onclick="openLink('https://appnest-store.pages.dev')">
       <div style="width:36px;height:36px;border-radius:9px;background:var(--accent-bg2);border:1px solid var(--accent2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
       </div>
@@ -2489,7 +2490,7 @@ function confirmDeleteAll() {
 }
 
 function shareApp() {
-  const url = 'https://barakaflalo.github.io/appnest';
+  const url = 'https://appnest-store.pages.dev';
   const txt = `Winner אנליזר — ${APP.username ? 'מ' + APP.username + ' | ' : ''}אפליקציה חכמה לניתוח טופס הוינר 16 | ${url}`;
   if (navigator.share) navigator.share({ title: 'Winner אנליזר', text: txt, url });
   else { navigator.clipboard?.writeText(txt); toast('הקישור הועתק!','s'); }
