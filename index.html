@@ -253,6 +253,29 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .mm-sheet{width:100%;background:var(--bg2);border-radius:18px 18px 0 0;padding:10px 12px 76px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .mm-sheet button{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px 8px;font-family:var(--font);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
 .bottom-white{box-shadow:none}
+
+/* ===== מראה טופס וינר ===== */
+.pick-cell{width:38px;height:38px;border-radius:6px;border:1px solid #cfd3d8;background:#eceff2;color:#2b2f33;font-size:14px;font-weight:700}
+.pick-cell.p1,.pick-cell.px,.pick-cell.p2{background:#FFCC00;border-color:#d9ae00;color:#111}
+.pick-cell.rec{outline:2px dashed #FFCC00;outline-offset:1px}
+.wn-head{display:flex;align-items:center;justify-content:space-between;background:#4a4b4f;color:#fff;border-radius:8px 8px 0 0;padding:9px 12px;font-size:12px;font-weight:700}
+.wn-head b{color:#FFCC00}
+.wn-table{border-radius:0 0 8px 8px;overflow:hidden;border:1px solid var(--border2);border-top:0}
+.wn-row{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.wn-row:nth-child(even){background:var(--bg3)}
+.wn-row:last-child{border-bottom:0}
+.wn-row .n{width:20px;text-align:center;color:var(--text3);font-size:11px;font-weight:600}
+.wn-row .t{flex:1;min-width:0}
+.wn-row .t .m{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-row .t .s{font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wn-cells{display:flex;gap:4px;flex-shrink:0}
+.wn-cell{width:30px;height:30px;border-radius:5px;background:#eceff2;border:1px solid #cfd3d8;color:#2b2f33;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.wn-cell.sel{background:#FFCC00;border-color:#d9ae00;color:#111}
+.wn-cell.act{box-shadow:0 0 0 2px #22c55e}
+.wn-mark{width:16px;text-align:center;font-size:13px;font-weight:700}
+.wn-tabs{display:flex;gap:5px;overflow-x:auto;padding:2px 0 8px}
+.wn-tab{flex-shrink:0;padding:5px 10px;border-radius:14px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:10px;font-weight:600;font-family:var(--font);cursor:pointer}
+.wn-tab.on{background:#FFCC00;border-color:#d9ae00;color:#111}
 </style>
 </head>
 <body>
@@ -426,7 +449,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
       <button onclick="clearAllPicks()" style="flex:1;padding:6px 4px;border-radius:8px;border:0.5px solid var(--border2);background:transparent;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;font-family:var(--font)">✕ נקה</button>
     </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px">
-      <div id="form-program-info" style="font-size:10px;color:var(--text3)"></div>
+      <div id="form-program-info" style="font-size:11px;color:var(--text2);font-weight:600"></div>
       <button id="refresh-form-btn" onclick="refreshWeeklyGames(false)" style="padding:6px 12px;border-radius:8px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);white-space:nowrap">🔄 רענן</button>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:6px">
@@ -1268,35 +1291,35 @@ function renderFormGames() {
       (APP.currentGames && APP.currentGames.length ? (oddsN ? ' · יחסים פתוחים' : ' · יחסים טרם נפתחו') : '');
   }
   const el = document.getElementById('form-games-list');
-  el.innerHTML = APP.currentGames.map((g, i) => {
+  const _rows = APP.currentGames.map((g, i) => {
     const p = APP.currentPicks[i];
     const rec = g.pick && g.pick !== '?' ? g.pick : null;
     const conf = g.confidence || '';
     const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
     const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
     const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` : '';
-    // תג המלצה קטן
     const noOdds = g.odds && !g.hasOdds;
     const recBadge = rec
       ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>`
-      : (noOdds ? `<span style="font-size:9px;color:var(--text3);white-space:nowrap">ליין טרם נפתח — מלא ידנית</span>` : '');
-    return `<div style="background:var(--bg2);border:0.5px solid ${p?'var(--accent2)':'var(--border)'};border-radius:var(--radius);padding:8px 10px;display:flex;align-items:center;gap:8px" id="game-row-${i}">
-      <div style="font-size:10px;color:var(--text3);width:14px;flex-shrink:0;text-align:center">${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} - ${g.away}</div>
-        <div style="font-size:9px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${meta}</div>
-        <div style="display:flex;gap:6px;align-items:center;margin-top:1px">
-          ${oddsTxt?`<span style="font-size:9px;color:var(--text3)">${oddsTxt}</span>`:''}
-          ${recBadge}
-        </div>
+      : (noOdds ? `<span style="font-size:9px;color:var(--text3);white-space:nowrap">ליין טרם נפתח</span>` : '');
+    return `<div class="wn-row" style="gap:8px;padding:8px 10px" id="game-row-${i}">
+      <div class="n">${i+1}</div>
+      <div class="t">
+        <div class="m">${g.home} - ${g.away}</div>
+        <div class="s">${meta}</div>
+        <div style="display:flex;gap:6px;align-items:center">${oddsTxt?`<span style="font-size:9px;color:var(--text3)">${oddsTxt}</span>`:''}${recBadge}</div>
       </div>
-      <div style="display:flex;gap:4px;flex-shrink:0">
+      <div style="display:flex;gap:5px;flex-shrink:0">
         <div class="pick-cell ${p==='1'?'p1':''} ${rec==='1'?'rec':''}" onclick="setPick(${i},'1')">1</div>
         <div class="pick-cell ${p==='X'?'px':''} ${rec==='X'?'rec':''}" onclick="setPick(${i},'X')">X</div>
         <div class="pick-cell ${p==='2'?'p2':''} ${rec==='2'?'rec':''}" onclick="setPick(${i},'2')">2</div>
       </div>
     </div>`;
   }).join('');
+  const _prog = APP.programNumber ? ('מחזור <b>' + APP.programNumber + '</b>') : 'טופס';
+  const _filled = Object.keys(APP.currentPicks).length;
+  el.style.gap = '0';
+  el.innerHTML = `<div class="wn-head"><span>Winner 16 · ${_prog}</span><span>${_filled}/${APP.currentGames.length}</span></div><div class="wn-table">${_rows}</div>`;
   updateFormBtn();
 }
 
@@ -1573,7 +1596,7 @@ function renderHistory() {
         <div style="display:flex;flex-wrap:wrap;gap:3px">${rowPreview}</div>
         ${stratBreakdown}
         <div class="history-actions" style="display:none;flex-direction:column;gap:6px;margin-top:10px;border-top:0.5px solid var(--border);padding-top:10px">
-          ${renderAllStrategyRows(f)}
+          ${renderTicket(f)}
           ${f.score === null ? `<button class="btn-gold" onclick="event.stopPropagation();openUpdateResults(${i})" style="font-size:12px;padding:9px">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             עדכן תוצאות אמיתיות</button>` : ''}
@@ -1587,6 +1610,34 @@ function renderHistory() {
 }
 
 // מציג את כל 4 השורות (אסטרטגיות + שלך) בטופס מורחב בהיסטוריה
+// ===== תצוגת טור בסגנון אתר הטוטו (היסטוריה) =====
+function renderTicket(f, key) {
+  const keys = Object.keys(METHOD_META).filter(k => { const o = METHOD_META[k].picks(f); return o && Object.keys(o).length; });
+  if (!keys.length) return '';
+  if (!key || !keys.includes(key)) key = keys.includes('manual') ? 'manual' : keys[0];
+  const picks = METHOD_META[key].picks(f) || {};
+  const res = f.results || null;
+  const idx = APP.forms.indexOf(f);
+  const tabs = keys.map(k => `<button class="wn-tab ${k===key?'on':''}" onclick="event.stopPropagation();ticketTab(${idx},'${k}')">${METHOD_META[k].label}</button>`).join('');
+  let hits = 0, known = 0;
+  const rows = f.games.map((g, i) => {
+    const v = picks[i];
+    const set = Array.isArray(v) ? v : (v ? String(v).split('') : []);
+    const r = res ? res[i] : null;
+    let mark = '';
+    if (r && set.length) { known++; if (set.includes(r)) { hits++; mark = '<span style="color:#22c55e">✓</span>'; } else mark = '<span style="color:#ef4444">✗</span>'; }
+    const cell = s => `<div class="wn-cell ${set.includes(s)?'sel':''} ${r===s?'act':''}">${s}</div>`;
+    const sc = (g.scoreHome != null && g.scoreAway != null) ? ` · ${g.scoreHome}-${g.scoreAway}` : '';
+    return `<div class="wn-row"><div class="n">${i+1}</div><div class="t"><div class="m">${g.home} - ${g.away}</div><div class="s">${[g.league, g.day&&g.time?g.day+' '+g.time:''].filter(Boolean).join(' · ')}${sc}</div></div><div class="wn-mark">${mark}</div><div class="wn-cells">${cell('1')}${cell('X')}${cell('2')}</div></div>`;
+  }).join('');
+  const head = `<div class="wn-head"><span>Winner 16 · ${f.program ? 'מחזור <b>'+f.program+'</b>' : f.week}</span><span>${res ? (hits+'/'+known+' פגיעות') : 'ממתין לתוצאות'}</span></div>`;
+  return `<div id="ticket-${idx}" onclick="event.stopPropagation()"><div class="wn-tabs">${tabs}</div>${head}<div class="wn-table">${rows}</div><div style="font-size:9px;color:var(--text3);text-align:center;margin:6px 0 4px">צהוב = הסימון שלך · מסגרת ירוקה = התוצאה בפועל</div></div>`;
+}
+function ticketTab(idx, key) {
+  const el = document.getElementById('ticket-' + idx);
+  if (el) el.outerHTML = renderTicket(APP.forms[idx], key);
+}
+
 function renderAllStrategyRows(f) {
   const results = f.results || null;
   const n = f.games.length;
@@ -1917,7 +1968,8 @@ function renderResultsPreview(form, results, found, pending) {
       ${sc?`<div style="font-size:10px;color:var(--text3)">${sc}</div>`:''}
       ${myBadge}
       <div style="font-size:9px;color:var(--text3)">←</div>
-      <div style="width:22px;height:22px;border-radius:5px;background:${pb(r)};color:${pc(r)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${r||'?'}</div>
+      ${r ? `<div style="width:22px;height:22px;border-radius:5px;background:${pb(r)};color:${pc(r)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700">${r}</div>`
+          : `<div style="display:flex;gap:3px">${['1','X','2'].map(x=>`<div onclick="manualResult(${i},'${x}')" style="width:22px;height:22px;border-radius:5px;background:#eceff2;border:1px solid #cfd3d8;color:#2b2f33;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;cursor:pointer">${x}</div>`).join('')}</div>`}
       <div style="width:14px;text-align:center">${mark}</div>
     </div>`;
   }).join('');
@@ -1928,10 +1980,21 @@ function renderResultsPreview(form, results, found, pending) {
   <div style="margin-bottom:10px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div style="font-size:12px;font-weight:600;color:var(--text)">תוצאות (${found}/${form.games.length})</div>
-      <div style="font-size:10px;color:var(--text3)">הניחוש שלך ← התוצאה</div>
+      <div style="font-size:10px;color:var(--text3)">הניחוש שלך ← התוצאה (חסר? לחץ 1/X/2 להשלמה)</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:4px">${rows}</div>
   </div>`;
+}
+
+// השלמה ידנית של תוצאה שלא נמצאה במקורות
+function manualResult(i, sign) {
+  const form = APP.forms[APP.currentUpdateFormIdx];
+  if (!form) return;
+  APP.pendingResults = APP.pendingResults || {};
+  APP.pendingResults[i] = sign;
+  const found = Object.keys(APP.pendingResults).length;
+  renderResultsPreview(form, APP.pendingResults, found, form.games.length - found);
+  const saveBtn = document.getElementById('upd-save-btn'); if (saveBtn) saveBtn.classList.remove('disabled');
 }
 
 function saveResults(formIdx) {
