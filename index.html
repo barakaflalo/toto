@@ -342,7 +342,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   </div>
   <div class="scroll-body">
     <div class="section-lbl" data-i18n="home_actions">פעולות ראשיות</div>
-    <div onclick="showScreen('screen-load-form')" style="background:var(--accent-bg);border:1.5px solid var(--accent2);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px">
+    <div onclick="openFill()" style="background:var(--accent-bg);border:1.5px solid var(--accent2);border-radius:var(--radius-lg);padding:16px;display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px">
       <div style="width:44px;height:44px;border-radius:11px;background:var(--accent-bg2);border:1px solid var(--accent2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </div>
@@ -434,7 +434,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== FILL FORM SCREEN ========== -->
 <div class="screen" id="screen-fill-form">
   <div class="topbar">
-    <div class="back-btn" onclick="goBack('screen-load-form')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       חזור
     </div>
@@ -1117,7 +1117,8 @@ function _renderScreen(id) {
 }
 function navTab(t) {
   if (t === 'more') { toggleMoreMenu(); return; }
-  const map = { home:'screen-home', fill:'screen-load-form', hist:'screen-history', perf:'screen-performance' };
+  if (t === 'fill') { openFill(); return; }
+  const map = { home:'screen-home', hist:'screen-history', perf:'screen-performance' };
   showScreen(map[t]);
 }
 function toggleMoreMenu() { const m = document.getElementById('more-menu'); if (m) m.classList.toggle('show'); }
@@ -1291,7 +1292,9 @@ function renderFormGames() {
   }
   const el = document.getElementById('form-games-list');
   const _rows = APP.currentGames.map((g, i) => {
-    const p = APP.currentPicks[i];
+    const _rein = (typeof AI_MODE !== 'undefined' && AI_MODE === 'reinforced');
+    const _rm = _rein ? (reinMarks()[i] || []) : [];
+    const p = _rein ? null : APP.currentPicks[i];
     const rec = g.pick && g.pick !== '?' ? g.pick : null;
     const conf = g.confidence || '';
     const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
@@ -1309,17 +1312,49 @@ function renderFormGames() {
         <div style="display:flex;gap:6px;align-items:center">${oddsTxt?`<span style="font-size:9px;color:var(--text3)">${oddsTxt}</span>`:''}${recBadge}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
-        <div class="pick-cell ${p==='1'?'p1':''} ${rec==='1'?'rec':''}" onclick="setPick(${i},'1')">1</div>
-        <div class="pick-cell ${p==='X'?'px':''} ${rec==='X'?'rec':''}" onclick="setPick(${i},'X')">X</div>
-        <div class="pick-cell ${p==='2'?'p2':''} ${rec==='2'?'rec':''}" onclick="setPick(${i},'2')">2</div>
+        <div class="pick-cell ${(p==='1'||_rm.includes('1'))?'p1':''} ${rec==='1'?'rec':''}" onclick="${_rein?`setMark(${i},'1')`:`setPick(${i},'1')`}">1</div>
+        <div class="pick-cell ${(p==='X'||_rm.includes('X'))?'px':''} ${rec==='X'?'rec':''}" onclick="${_rein?`setMark(${i},'X')`:`setPick(${i},'X')`}">X</div>
+        <div class="pick-cell ${(p==='2'||_rm.includes('2'))?'p2':''} ${rec==='2'?'rec':''}" onclick="${_rein?`setMark(${i},'2')`:`setPick(${i},'2')`}">2</div>
       </div>
     </div>`;
   }).join('');
   const _prog = APP.programNumber ? ('מחזור <b>' + APP.programNumber + '</b>') : 'טופס';
-  const _filled = Object.keys(APP.currentPicks).length;
+  const _filled = formFilledCount();
   el.style.gap = '0';
   el.innerHTML = `<div class="wn-head"><span>Winner 16 · ${_prog}</span><span>${_filled}/${APP.currentGames.length}</span></div><div class="wn-table">${_rows}</div>`;
   updateFormBtn();
+}
+
+// ===== טור מחוזק ידני: כמה סימנים למשחק (לחיצה נוספת מבטלת) =====
+function reinMarks() {
+  const rc = APP.reinforcedColumn;
+  if (rc && rc.marks && (!rc.program || String(rc.program) === String(APP.programNumber || ''))) return rc.marks;
+  return {};
+}
+function formIsReinMode() { return typeof AI_MODE !== 'undefined' && AI_MODE === 'reinforced'; }
+function formFilledCount() {
+  if (formIsReinMode()) { const m = reinMarks(); return APP.currentGames.filter((g, i) => m[i] && m[i].length).length; }
+  return Object.keys(APP.currentPicks).length;
+}
+function formIsComplete() {
+  const total = APP.currentGames.length;
+  const m = reinMarks();
+  const reinFull = total > 0 && APP.currentGames.every((g, i) => m[i] && m[i].length);
+  return Object.keys(APP.currentPicks).length === total || reinFull;
+}
+function setMark(i, v) {
+  let rc = APP.reinforcedColumn;
+  if (!rc || !rc.marks || (rc.program && String(rc.program) !== String(APP.programNumber || ''))) {
+    rc = APP.reinforcedColumn = { picks: {}, marks: {}, type: {}, program: APP.programNumber || '' };
+  }
+  const cur = (rc.marks[i] || []).slice();
+  const at = cur.indexOf(v);
+  if (at >= 0) cur.splice(at, 1); else cur.push(v);
+  const order = ['1', 'X', '2'];
+  cur.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  if (cur.length) { rc.marks[i] = cur; rc.picks[i] = cur[0]; rc.type[i] = cur.length === 1 ? 'single' : cur.length === 2 ? 'double' : 'triple'; }
+  else { delete rc.marks[i]; delete rc.picks[i]; delete rc.type[i]; }
+  renderFormGames();
 }
 
 function setPick(i, v) {
@@ -1335,13 +1370,13 @@ function setPick(i, v) {
 }
 
 function updateFormBtn() {
-  const n = Object.keys(APP.currentPicks).length;
+  const n = formFilledCount();
   const total = APP.currentGames.length;
   const btn = document.getElementById('form-analyze-btn');
   const hint = document.getElementById('form-btn-hint');
   const prog = document.getElementById('form-progress');
   prog.textContent = `${n}/${total}`;
-  if (n === total) {
+  if (formIsComplete()) {
     btn.classList.remove('disabled');
     hint.textContent = 'מוכן לניתוח!';
     hint.style.color = 'var(--accent2)';
@@ -1397,7 +1432,12 @@ function clearAllPicks() { APP.currentPicks = {}; renderFormGames(); }
 
 function analyzeForm() {
   const n = Object.keys(APP.currentPicks).length;
-  if (n < APP.currentGames.length) return;
+  if (n < APP.currentGames.length) {
+    // מילאת רק טור מחוזק: הסימן הראשי של כל משחק הופך לבחירה הידנית
+    const m = reinMarks();
+    if (!(APP.currentGames.length && APP.currentGames.every((g, i) => m[i] && m[i].length))) return;
+    APP.currentGames.forEach((g, i) => { if (!APP.currentPicks[i]) APP.currentPicks[i] = m[i][0]; });
+  }
 
   // מחשבים את 3 האסטרטגיות מהיחסים
   const strategies = {};
@@ -3201,6 +3241,7 @@ function setAIMode(m) {
     rein.setAttribute('style', m === 'reinforced' ? on : off);
   }
   if (opts) opts.style.display = m === 'reinforced' ? 'flex' : 'none';
+  if (APP.currentGames && APP.currentGames.length && document.getElementById('form-games-list')) renderFormGames();
 }
 
 async function generateAIColumn() {
@@ -3430,6 +3471,17 @@ function friendlyLoadError(e) {
   const m = String((e && e.message) || e);
   if (/no source|500|לא התקבלו/.test(m)) return 'אין כרגע מחזור פעיל — נסה שוב כשהטופס הבא ייפתח';
   return 'שגיאה בטעינה: ' + m;
+}
+
+// כניסה למילוי טור: טוען אוטומטית את המחזור הנוכחי (cache-first), בלי מסך "לחץ כדי לטעון"
+async function openFill() {
+  if (APP.currentGames && APP.currentGames.length) {
+    showScreen('screen-fill-form'); refreshWeeklyGames(true); return;
+  }
+  toast('טוען את המחזור הנוכחי...', 'info');
+  const had = loadSavedGames();
+  await loadWeeklyGames();
+  if (!(APP.currentGames && APP.currentGames.length) && !had) showScreen('screen-load-form');
 }
 
 async function loadWeeklyGames() {
