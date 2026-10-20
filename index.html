@@ -242,6 +242,17 @@ body{padding-bottom:0}
 .screen{-webkit-overflow-scrolling:touch}
 button{-webkit-tap-highlight-color:transparent}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#bottom-nav{flex-shrink:0;display:flex;background:var(--bg2);border-top:1px solid var(--border2);padding:6px 4px max(8px,env(safe-area-inset-bottom));box-shadow:0 -6px 18px rgba(0,0,0,.18);z-index:50}
+.bn-item{flex:1;background:none;border:none;color:var(--text3);display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--font);font-size:10px;font-weight:600;padding:4px 0;cursor:pointer;border-radius:10px;transition:color .15s}
+.bn-item svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bn-item.on{color:var(--accent)}
+.bn-item.on svg{stroke-width:2.3}
+#more-menu{display:none;position:absolute;inset:0;z-index:60;background:rgba(0,0,0,.45);align-items:flex-end}
+#more-menu.show{display:flex}
+.mm-sheet{width:100%;background:var(--bg2);border-radius:18px 18px 0 0;padding:10px 12px 76px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mm-sheet button{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:14px 8px;font-family:var(--font);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.bottom-white{box-shadow:none}
 </style>
 </head>
 <body>
@@ -372,7 +383,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== LOAD FORM SCREEN ========== -->
 <div class="screen" id="screen-load-form">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       בית
     </div>
@@ -400,7 +411,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== FILL FORM SCREEN ========== -->
 <div class="screen" id="screen-fill-form">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-load-form')">
+    <div class="back-btn" onclick="goBack('screen-load-form')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       חזור
     </div>
@@ -447,7 +458,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== MATCH ANALYSIS SCREEN ========== -->
 <div class="screen" id="screen-match-analysis">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       בית
     </div>
@@ -478,7 +489,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== HISTORY SCREEN ========== -->
 <div class="screen" id="screen-history">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       בית
     </div>
@@ -494,7 +505,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== PERFORMANCE / CALIBRATION SCREEN ========== -->
 <div class="screen" id="screen-performance">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-history')">
+    <div class="back-btn" onclick="goBack('screen-history')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       חזור
     </div>
@@ -507,7 +518,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== UPDATE RESULTS SCREEN ========== -->
 <div class="screen" id="screen-update-results">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-history')">
+    <div class="back-btn" onclick="goBack('screen-history')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       היסטוריה
     </div>
@@ -520,7 +531,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== AI CONNECT SCREEN ========== -->
 <div class="screen" id="screen-ai-connect">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       בית
     </div>
@@ -552,7 +563,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== SETTINGS SCREEN ========== -->
 <div class="screen" id="screen-settings">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       בית
     </div>
@@ -673,7 +684,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== ABOUT SCREEN ========== -->
 <div class="screen" id="screen-about">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-settings')">
+    <div class="back-btn" onclick="goBack('screen-settings')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       הגדרות
     </div>
@@ -686,7 +697,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
       </div>
       <div style="font-family:'Rubik Mono One',monospace;font-size:20px;color:var(--accent)">Winner אנליזר</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:4px">גרסה 1.1.0</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">גרסה 1.2.0</div>
     </div>
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--border)">
@@ -759,7 +770,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== NO AI SCREEN ========== -->
 <div class="screen" id="screen-no-ai">
   <div class="topbar">
-    <div class="back-btn" id="no-ai-back" onclick="showScreen('screen-home')">
+    <div class="back-btn" id="no-ai-back" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       חזור
     </div>
@@ -815,7 +826,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== ADMIN SCREEN ========== -->
 <div class="screen" id="screen-admin">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-settings')">
+    <div class="back-btn" onclick="goBack('screen-settings')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       הגדרות
     </div>
@@ -856,7 +867,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 <!-- ========== FORM RESULT SCREEN ========== -->
 <div class="screen" id="screen-form-result">
   <div class="topbar">
-    <div class="back-btn" onclick="showScreen('screen-home')">
+    <div class="back-btn" onclick="goBack('screen-home')">
       <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
       ← בית
     </div>
@@ -878,6 +889,23 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   <p>⚠️ נתונים ממקורות חיצוניים — ייתכנו טעויות. יש לאמת מול האתר הרשמי. אין אחריות. הימור אסור מתחת לגיל 18. <span class="gd-more" onclick="showScreen('screen-about')">פרטים</span></p>
 </div>
 
+
+<!-- ========== BOTTOM NAV ========== -->
+<div id="more-menu" onclick="closeMoreMenu()">
+  <div class="mm-sheet" onclick="event.stopPropagation()">
+    <button onclick="moreGo('screen-match-analysis')"><span>🔍</span>ניתוח משחק</button>
+    <button onclick="moreGo('screen-ai-connect')"><span>🤖</span>חיבור AI</button>
+    <button onclick="moreGo('screen-settings')"><span>⚙️</span>הגדרות</button>
+    <button onclick="moreGo('screen-about')"><span>ℹ️</span>אודות</button>
+  </div>
+</div>
+<nav id="bottom-nav" style="display:none">
+  <button class="bn-item" data-tab="home" onclick="navTab('home')"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>בית</span></button>
+  <button class="bn-item" data-tab="fill" onclick="navTab('fill')"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>מילוי טור</span></button>
+  <button class="bn-item" data-tab="hist" onclick="navTab('hist')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>היסטוריה</span></button>
+  <button class="bn-item" data-tab="perf" onclick="navTab('perf')"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>ביצועים</span></button>
+  <button class="bn-item" data-tab="more" onclick="navTab('more')"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg><span>עוד</span></button>
+</nav>
 </div><!-- end .app -->
 
 <script>
@@ -1013,20 +1041,67 @@ function init() {
   }, 2000);
 }
 
-function showScreen(id) {
+// ===== ניווט: היסטוריית דפדפן פנימית + סרגל תחתון =====
+const NAV = { current: 'screen-splash', depth: 0, noNav: ['screen-splash','screen-guide','screen-fill-form','screen-update-results','screen-form-result','screen-no-ai','screen-admin'] };
+const NAV_TAB = { 'screen-home':'home','screen-load-form':'fill','screen-history':'hist','screen-performance':'perf' };
+
+function showScreen(id, fromPop) {
+  if (!fromPop && id !== NAV.current) {
+    const silent = (NAV.current === 'screen-splash' || NAV.current === 'screen-guide');
+    try {
+      if (silent) history.replaceState({ s: id, d: NAV.depth }, '');
+      else { NAV.depth++; history.pushState({ s: id, d: NAV.depth }, ''); }
+    } catch (e) {}
+  }
+  _renderScreen(id);
+}
+function goBack(fallback) {
+  if (NAV.depth > 0) { try { history.back(); return; } catch (e) {} }
+  _renderScreen(fallback || 'screen-home');
+}
+window.addEventListener('popstate', function (ev) {
+  // סוגרים קודם שכבות פתוחות (דיאלוג / תוצאת משחק) ואז חוזרים מסך
+  const dlg = document.getElementById('dlg-ov');
+  if (dlg && dlg.classList.contains('open')) { dlg.classList.remove('open'); history.pushState({ s: NAV.current, d: NAV.depth }, ''); return; }
+  const mv = document.getElementById('match-result-view');
+  if (NAV.current === 'screen-match-analysis' && mv && mv.style.display !== 'none') {
+    mv.style.display = 'none'; document.getElementById('match-input-view').style.display = 'flex';
+    history.pushState({ s: NAV.current, d: NAV.depth }, ''); return;
+  }
+  const st = ev.state;
+  if (st && st.s) { NAV.depth = st.d || 0; _renderScreen(st.s); }
+  else { NAV.depth = 0; _renderScreen('screen-home'); }
+});
+function _renderScreen(id) {
+  NAV.current = id;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
+  const nav = document.getElementById('bottom-nav');
+  if (nav) {
+    nav.style.display = NAV.noNav.includes(id) ? 'none' : 'flex';
+    const t = NAV_TAB[id] || (['screen-settings','screen-about','screen-ai-connect','screen-match-analysis'].includes(id) ? 'more' : '');
+    nav.querySelectorAll('.bn-item').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  }
+  closeMoreMenu();
   if (id === 'screen-history') renderHistory();
   if (id === 'screen-performance') renderPerformance();
   if (id === 'screen-home') { updateHomeStats(); updateHomeAIStatus(); }
   if (id === 'screen-match-analysis') {
-    // תמיד פותחים במסך הרשימה (לא בתוצאה של משחק קודם)
     document.getElementById('match-input-view').style.display = 'flex';
     document.getElementById('match-result-view').style.display = 'none';
     const s = document.getElementById('match-search'); if (s) s.value = '';
     setMatchSource(APP.matchSource || 'line');
   }
 }
+function navTab(t) {
+  if (t === 'more') { toggleMoreMenu(); return; }
+  const map = { home:'screen-home', fill:'screen-load-form', hist:'screen-history', perf:'screen-performance' };
+  showScreen(map[t]);
+}
+function toggleMoreMenu() { const m = document.getElementById('more-menu'); if (m) m.classList.toggle('show'); }
+function closeMoreMenu() { const m = document.getElementById('more-menu'); if (m) m.classList.remove('show'); }
+function moreGo(id) { closeMoreMenu(); showScreen(id); }
+try { history.replaceState({ s: 'screen-splash', d: 0 }, ''); } catch (e) {}
 
 function applyTheme(t) {
   APP.theme = t;

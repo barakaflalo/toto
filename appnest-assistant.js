@@ -349,7 +349,7 @@
   }
 
   function buildPanel() {
-    panelEl = el('div', 'position:fixed;bottom:146px;left:16px;width:340px;max-width:calc(100vw - 32px);height:460px;max-height:calc(100vh - 120px);' +
+    panelEl = el('div', 'position:fixed;bottom:140px;left:16px;width:340px;max-width:calc(100vw - 32px);height:460px;max-height:calc(100vh - 120px);' +
       'background:#141418;border:1px solid #2e2e38;border-radius:16px;z-index:100000;display:none;flex-direction:column;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.55);');
     var head = el('div', 'padding:12px 14px;background:linear-gradient(90deg,#1a1a20,#141418);border-bottom:1px solid #2e2e38;display:flex;align-items:center;gap:8px;');
     head.appendChild(el('span', 'font-size:17px;', '🪄'));
@@ -433,7 +433,7 @@
 
   function addButton() {
     if (document.getElementById('appnest-assistant-btn')) return;
-    var b = el('button', 'position:fixed;bottom:84px;left:12px;z-index:100000;background:#C9A84C;color:#0B0B0F;border:none;' +
+    var b = el('button', 'position:fixed;bottom:78px;left:12px;z-index:100000;background:#C9A84C;color:#0B0B0F;border:none;' +
       'border-radius:24px;padding:10px 18px;font:600 15px "Segoe UI",sans-serif;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.4);', '🪄 עוזר');
     b.id = 'appnest-assistant-btn';
     b.onclick = toggle;
