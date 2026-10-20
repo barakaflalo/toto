@@ -1299,7 +1299,7 @@ function renderFormGames() {
     const conf = g.confidence || '';
     const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
     const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
-    const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` : '';
+    const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` + (g.oddsN > 1 ? ` · ממוצע ${g.oddsN} מקורות` : (g.oddsN === 1 ? ' · מקור אחד' : '')) : '';
     const noOdds = g.odds && !g.hasOdds;
     const recBadge = rec
       ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>`
@@ -3563,7 +3563,9 @@ async function fetchAndStoreGames() {
     status: g.status || '',
     odds: g.odds, probs: g.probs,
     pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
-    result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway
+    result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway,
+    oddsN: g.oddsN || 0, oddsSources: g.oddsSources || [], oddsSpread: g.oddsSpread || 0,
+    date: g.date || '', day: g.day || '', time: g.time || ''
   }));
   APP.programNumber = data.program || '';
   APP.programDate = data.date || '';
