@@ -233,6 +233,15 @@ textarea{resize:none}
 /* RESPONSIVE */
 @media(max-width:360px){.scroll-body{padding:12px}}
 .pick-cell.rec{outline:1.5px dashed var(--accent2);outline-offset:-1px}
+
+/* ליטוש v34 */
+.bottom-white{border-top:1px solid var(--border2);box-shadow:0 -6px 18px rgba(0,0,0,.12)}
+.btn-primary:active,.btn-gold:active{transform:scale(.98)}
+.btn-primary,.btn-gold{min-height:48px}
+body{padding-bottom:0}
+.screen{-webkit-overflow-scrolling:touch}
+button{-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body>
@@ -1613,8 +1622,24 @@ async function fetchResultsAuto(formIdx) {
       else pending++;
     });
 
+    // גיבוי מהמאגר (D1): משלים משחקים שהמקור החי כבר לא מחזיק, לפי שמות הקבוצות
+    let fromDb = 0;
+    if (pending > 0) {
+      try {
+        const missIdx = form.games.map((g, i) => i).filter(i => !results[i]);
+        const r2 = await fetch(CLOUDFLARE_WORKER_URL + '/?formresults=1', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ since: form.id || 0, games: missIdx.map(i => ({ home: form.games[i].home, away: form.games[i].away })) })
+        });
+        const d2 = await r2.json();
+        if (d2 && d2.ok && Array.isArray(d2.results)) {
+          d2.results.forEach((x, k) => { if (x && x.result) { results[missIdx[k]] = x.result; found++; pending--; fromDb++; } });
+        }
+      } catch (e) {}
+    }
+
     if (found === 0) {
-      toast('אין עדיין תוצאות זמינות — נסה מאוחר יותר', 'i');
+      toast('לא נמצאו תוצאות — ייתכן שהמשחקים טרם הסתיימו, או שהמחזור כבר לא זמין במקורות', 'i');
       if (btn) { btn.disabled = false; btn.textContent = '🏆 משוך תוצאות עכשיו'; }
       return;
     }
@@ -1631,6 +1656,7 @@ async function fetchResultsAuto(formIdx) {
       const mine = sc.manual;
       hint.textContent = mine ? ('צדקת ב-' + mine.correct + '/' + mine.total + ' — שמור כדי לשמור') : (found + ' תוצאות נמצאו — שמור');
     }
+    if (fromDb) toast(fromDb + ' תוצאות נשלפו מהמאגר ✓', 'i');
     if (btn) { btn.disabled = false; btn.textContent = '🔄 רענן תוצאות'; }
   } catch (e) {
     toast('שגיאה: ' + e.message, 'error');
