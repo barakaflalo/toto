@@ -1636,9 +1636,10 @@ function renderHistory() {
         ${stratBreakdown}
         <div class="history-actions" style="display:none;flex-direction:column;gap:6px;margin-top:10px;border-top:0.5px solid var(--border);padding-top:10px">
           ${renderTicket(f)}
-          ${f.score === null ? `<button class="btn-gold" onclick="event.stopPropagation();openUpdateResults(${i})" style="font-size:12px;padding:9px">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-            עדכן תוצאות אמיתיות</button>` : ''}
+          ${(() => { const have = f.results ? Object.keys(f.results).length : 0, tot = f.games.length;
+            const lbl = f.score === null ? 'עדכן תוצאות אמיתיות' : (have < tot ? '🔄 השלם תוצאות חסרות (' + have + '/' + tot + ')' : '🔄 רענן / תקן תוצאות');
+            const cls = (f.score === null || have < tot) ? 'btn-gold' : 'btn-outline';
+            return `<button class="${cls}" onclick="event.stopPropagation();openUpdateResults(${i})" style="font-size:12px;padding:9px">${lbl}</button>`; })()}
           <div style="display:flex;gap:6px">
             <button class="btn-outline" style="flex:1;font-size:11px" onclick="event.stopPropagation();reopenForm(${i})">↻ פתח מחדש</button>
             <button class="btn-outline" style="flex:1;font-size:11px;border-color:var(--red-border);color:var(--red)" onclick="event.stopPropagation();deleteForm(${i})">מחק</button>
@@ -1759,6 +1760,13 @@ function openUpdateResults(formIdx) {
       <button class="btn-primary disabled" id="upd-save-btn" onclick="saveResults(${formIdx})">שמור תוצאות</button>
     </div>`;
   showScreen('screen-update-results');
+  if (form.results && Object.keys(form.results).length) {
+    APP.pendingResults = { ...form.results };
+    const n = Object.keys(APP.pendingResults).length;
+    renderResultsPreview(form, APP.pendingResults, n, form.games.length - n);
+    const sb = document.getElementById('upd-save-btn'); if (sb) sb.classList.remove('disabled');
+    const fb = document.getElementById('fetch-results-btn'); if (fb) fb.textContent = '🔄 משוך תוצאות חסרות';
+  } else { APP.pendingResults = null; }
 }
 
 // משיכת תוצאות אמיתיות מהשרת והצגתן
@@ -1778,13 +1786,13 @@ async function fetchResultsAuto(formIdx) {
     // התאמה חסינה: קודם לפי מספר המשחק (1-16), אחר כך לפי שם גמיש
     const byNum = {};
     data.games.forEach(x => { if (x.num != null) byNum[Number(x.num)] = x; });
-    const results = {};
+    const results = { ...(form.results || {}) };      // שומר תוצאות שכבר נשמרו; משלים רק מה שחסר
     let found = 0, pending = 0;
     form.games.forEach((g, i) => {
       let match = byNum[i + 1] || null;               // המשחק ה-i בטופס = מספר i+1 בתוצאות
       if (!match) match = data.games.find(x => sameGameFuzzy(x, g)); // גיבוי לפי שם
-      if (match && match.result) { results[i] = match.result; found++; }
-      else pending++;
+      if (match && match.result) results[i] = match.result;
+      if (results[i]) found++; else pending++;
     });
 
     // גיבוי מהמאגר (D1): משלים משחקים שהמקור החי כבר לא מחזיק, לפי שמות הקבוצות
