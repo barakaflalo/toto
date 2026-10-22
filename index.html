@@ -1751,6 +1751,7 @@ function openUpdateResults(formIdx) {
         </button>
       </div>
       <div id="results-preview" style="display:none"></div>
+      ${(form.results && Object.keys(form.results).length) ? `<div style="text-align:center;margin:6px 0"><button onclick="clearResults(${formIdx})" style="background:none;border:0.5px solid var(--border);color:var(--text3);font-size:11px;padding:7px 14px;border-radius:8px;cursor:pointer">🗑 נקה את כל התוצאות של הטופס</button></div>` : ''}
       <div style="text-align:center;font-size:10px;color:var(--text3);line-height:1.5;padding:8px 12px">
         התוצאות זמינות כל עוד הטופס פעיל השבוע.<br>אחרי שהטופס הבא מתפרסם, ייתכן שחלק מהתוצאות כבר לא יימשכו.
       </div>
@@ -1767,6 +1768,14 @@ function openUpdateResults(formIdx) {
     const sb = document.getElementById('upd-save-btn'); if (sb) sb.classList.remove('disabled');
     const fb = document.getElementById('fetch-results-btn'); if (fb) fb.textContent = '🔄 משוך תוצאות חסרות';
   } else { APP.pendingResults = null; }
+}
+
+
+// האם המשחק עדיין לא הסתיים (לפי תאריך/שעה שנשמרו) — לא מקבלים לו תוצאה
+function gameNotFinished(g) {
+  if (!g || !g.date) return false;
+  const t = Date.parse(g.date + 'T' + (g.time || '00:00') + ':00+03:00');
+  return isFinite(t) && Date.now() < t + 100 * 60 * 1000;
 }
 
 // משיכת תוצאות אמיתיות מהשרת והצגתן
@@ -1791,7 +1800,7 @@ async function fetchResultsAuto(formIdx) {
     form.games.forEach((g, i) => {
       let match = byNum[i + 1] || null;               // המשחק ה-i בטופס = מספר i+1 בתוצאות
       if (!match) match = data.games.find(x => sameGameFuzzy(x, g)); // גיבוי לפי שם
-      if (match && match.result) results[i] = match.result;
+      if (match && match.result && !gameNotFinished(g)) results[i] = match.result;
       if (results[i]) found++; else pending++;
     });
 
@@ -1802,11 +1811,11 @@ async function fetchResultsAuto(formIdx) {
         const missIdx = form.games.map((g, i) => i).filter(i => !results[i]);
         const r2 = await fetch(CLOUDFLARE_WORKER_URL + '/?formresults=1', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ since: form.id || 0, games: missIdx.map(i => ({ home: form.games[i].home, away: form.games[i].away })) })
+          body: JSON.stringify({ since: form.id || 0, games: missIdx.map(i => ({ home: form.games[i].home, away: form.games[i].away, date: form.games[i].date || '' })) })
         });
         const d2 = await r2.json();
         if (d2 && d2.ok && Array.isArray(d2.results)) {
-          d2.results.forEach((x, k) => { if (x && x.result) { results[missIdx[k]] = x.result; found++; pending--; fromDb++; } });
+          d2.results.forEach((x, k) => { if (x && x.result && !gameNotFinished(form.games[missIdx[k]])) { results[missIdx[k]] = x.result; found++; pending--; fromDb++; } });
         }
       } catch (e) {}
     }
@@ -2079,6 +2088,17 @@ function saveResults(formIdx, silent) {
   renderHistory();
 }
 
+function clearResults(formIdx) {
+  const form = APP.forms[formIdx]; if (!form) return;
+  form.results = null; form.scores = null; form.score = null; form.best = null;
+  _autoRes.last[form.id || formIdx] = Date.now();   // לא למשוך שוב מיד
+  localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
+  updateHomeStats();
+  toast('התוצאות נוקו', 's');
+  showScreen('screen-history');
+  renderHistory();
+}
+
 // עדכון תוצאות אוטומטי ושקט בכניסה להיסטוריה (בלי כפתור)
 const _autoRes = { running: false, last: {} };
 async function autoUpdateHistoryResults() {
@@ -2110,7 +2130,7 @@ async function autoUpdateHistoryResults() {
               let m = byNum[i + 1];
               if (m && !(nameSim(m.home, g.home) >= 0.5 && nameSim(m.away, g.away) >= 0.5)) m = null;
               if (!m) m = data.games.find(x => sameGameFuzzy(x, g));
-              if (m && m.result) results[i] = m.result;
+              if (m && m.result && !gameNotFinished(g)) results[i] = m.result;
             });
           }
         } catch (e) {}
@@ -2119,10 +2139,10 @@ async function autoUpdateHistoryResults() {
           try {
             const r2 = await fetch(CLOUDFLARE_WORKER_URL + '/?formresults=1', {
               method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ since: form.id || 0, games: miss.map(i => ({ home: form.games[i].home, away: form.games[i].away })) })
+              body: JSON.stringify({ since: form.id || 0, games: miss.map(i => ({ home: form.games[i].home, away: form.games[i].away, date: form.games[i].date || '' })) })
             });
             const d2 = await r2.json();
-            if (d2 && d2.ok && Array.isArray(d2.results)) d2.results.forEach((x, k) => { if (x && x.result) results[miss[k]] = x.result; });
+            if (d2 && d2.ok && Array.isArray(d2.results)) d2.results.forEach((x, k) => { if (x && x.result && !gameNotFinished(form.games[miss[k]])) results[miss[k]] = x.result; });
           } catch (e) {}
         }
         if (Object.keys(results).length > before) {
