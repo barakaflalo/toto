@@ -1316,6 +1316,9 @@ function renderFormGames() {
     const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
     const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` + (g.oddsN > 1 ? ` · ממוצע ${g.oddsN} מקורות` + (g.oddsSpread > 0.3 ? ' ⚠ מקורות חלוקים' : '') : (g.oddsN === 1 ? ' · מקור אחד' : '')) : '';
     const noOdds = g.odds && !g.hasOdds;
+    const _bv = bestValue(g), _tr = trendInfo(g);
+    const valBadge = (_bv && _bv.ev >= 0.02) ? `<span style="font-size:9px;color:var(--accent);white-space:nowrap">💎 ערך: ${_bv.k}</span>` : '';
+    const trBadge = _tr ? `<span style="font-size:9px;color:${_tr.pct < 0 ? 'var(--green)' : 'var(--red)'};white-space:nowrap">${_tr.pct < 0 ? '↓' : '↑'} ${_tr.k} ${Math.round(Math.abs(_tr.pct) * 100)}%</span>` : '';
     const recBadge = rec
       ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>`
       : (noOdds ? `<span style="font-size:9px;color:var(--text3);white-space:nowrap">ליין טרם נפתח</span>` : '');
@@ -1324,7 +1327,7 @@ function renderFormGames() {
       <div class="t" onclick="openMatchSheet(${i})">
         <div class="m">${g.home} - ${g.away} <span style="color:var(--accent);font-size:11px">›</span></div>
         <div class="s">${meta}</div>
-        <div style="display:flex;gap:6px;align-items:center">${oddsTxt?`<span style="font-size:10px;color:var(--text2)">${oddsTxt}</span>`:''}${recBadge}</div>
+        <div style="display:flex;gap:6px;align-items:center">${oddsTxt?`<span style="font-size:10px;color:var(--text2)">${oddsTxt}</span>`:''}${recBadge}${valBadge}${trBadge}</div>
       </div>
       <div style="display:flex;gap:5px;flex-shrink:0">
         <div class="pick-cell ${(p==='1'||_rm.includes('1'))?'p1':''} ${rec==='1'?'rec':''}" onclick="${_rein?`setMark(${i},'1')`:`setPick(${i},'1')`}">1</div>
@@ -1512,9 +1515,101 @@ function analyzeForm() {
 }
 
 // ===== מסך ביצועים/כיול — אילו שיטות מדייקות לאורך זמן =====
+function perfTab(t) { APP.perfTab = t; renderPerformance(); }
 function renderPerformance() {
-  const box = document.getElementById('performance-content');
-  if (!box) return;
+  const root = document.getElementById('performance-content');
+  if (!root) return;
+  const tab = APP.perfTab || 'methods';
+  const pill = (id, label) => `<div onclick="perfTab('${id}')" style="flex:1;text-align:center;padding:9px 4px;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;border:0.5px solid ${tab === id ? 'var(--accent2)' : 'var(--border)'};background:${tab === id ? 'var(--accent-bg)' : 'var(--bg2)'};color:${tab === id ? 'var(--accent)' : 'var(--text2)'}">${label}</div>`;
+  root.innerHTML = `<div style="display:flex;gap:8px;margin-bottom:12px">${pill('methods', 'שיטות מילוי')}${pill('sources', 'מקורות יחסים')}</div><div id="perf-inner"></div>`;
+  const inner = document.getElementById('perf-inner');
+  if (tab === 'sources') renderPerfSources(inner); else renderPerfMethods(inner);
+}
+
+// ---- לשונית "מקורות יחסים": דיוק כל מקור, כיול, ערך מול שוק ----
+function oddsObjProbs(o) {
+  if (!o) return null;
+  const a = [Number(o['1']), Number(o['X']), Number(o['2'])];
+  if (!(a[0] > 1 && a[1] > 1 && a[2] > 1)) return null;
+  const inv = a.map(x => 1 / x), t = inv[0] + inv[1] + inv[2];
+  return { '1': inv[0] / t, 'X': inv[1] / t, '2': inv[2] / t };
+}
+function renderPerfSources(box) {
+  const forms = (APP.forms || []).filter(f => f.results && Object.keys(f.results).length);
+  const acc = {};            // לפי מקור: n, hit, brier, ll
+  const add = (name, p, res) => {
+    if (!p || !res) return;
+    const a = acc[name] = acc[name] || { n: 0, hit: 0, brier: 0, ll: 0 };
+    const fav = ['1', 'X', '2'].reduce((b, k) => p[k] > p[b] ? k : b, '1');
+    a.n++; if (fav === res) a.hit++;
+    a.brier += ['1', 'X', '2'].reduce((t, k) => t + Math.pow(p[k] - (k === res ? 1 : 0), 2), 0);
+    a.ll += -Math.log(Math.max(0.001, p[res]));
+  };
+  const cal = [[0, .2], [.2, .3], [.3, .4], [.4, .5], [.5, .6], [.6, .75], [.75, 1.01]].map(r => ({ lo: r[0], hi: r[1], n: 0, pSum: 0, hit: 0 }));
+  let games = 0, valN = 0, valHit = 0, valRet = 0, favRet = 0, favN = 0, mW = 0, mM = 0, mN = 0;
+  forms.forEach(f => (f.games || []).forEach((g, i) => {
+    const res = f.results[i]; if (!res) return;
+    games++;
+    const pc = g.hasOdds ? oddsObjProbs(g.odds) : null;
+    if (pc) {
+      add('יחס משולב (מה שהאפליקציה מציגה)', pc, res);
+      ['1', 'X', '2'].forEach(k => { const c = cal.find(b => pc[k] >= b.lo && pc[k] < b.hi); if (c) { c.n++; c.pSum += pc[k]; if (k === res) c.hit++; } });
+    }
+    (g.oddsSources || []).forEach(src => add(src.name, oddsObjProbs(src.odds), res));
+    if (g.marketOdds) add('שוק (DraftKings + Betexplorer)', oddsObjProbs(g.marketOdds), res);
+    if (g.winnerOdds) {
+      add('Winner בלבד (בנקרים/365)', oddsObjProbs(g.winnerOdds), res);
+      const wp = oddsObjProbs(g.winnerOdds); const fk = ['1', 'X', '2'].reduce((b, k) => wp[k] > wp[b] ? k : b, '1');
+      favN++; favRet += (fk === res ? Number(g.winnerOdds[fk]) - 1 : -1);
+      if (g.marketOdds) {
+        const inv = o => ['1', 'X', '2'].reduce((t, k) => t + 1 / Number(o[k]), 0) - 1;
+        mW += inv(g.winnerOdds); mM += inv(g.marketOdds); mN++;
+      }
+    }
+    const bv = bestValue(g);
+    if (bv && bv.ev >= 0.02 && g.winnerOdds) { valN++; if (bv.k === res) { valHit++; valRet += Number(g.winnerOdds[bv.k]) - 1; } else valRet -= 1; }
+  }));
+  const names = Object.keys(acc).sort((a, b) => (acc[a].brier / acc[a].n) - (acc[b].brier / acc[b].n));
+  if (!games || !names.length) {
+    box.innerHTML = `<div style="padding:24px 20px;text-align:center"><div style="font-size:40px;margin-bottom:10px">🔬</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px">עדיין אין נתונים למדידת מקורות</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7">המסך משווה את דיוק כל מקור יחסים מול התוצאות האמיתיות.<br>הוא יתמלא אחרי שתשמור טפסים ותתעדכן בהם תוצאות.</div></div>`;
+    return;
+  }
+  const bestN = names[0];
+  const rows = names.map((nm, idx) => {
+    const a = acc[nm], br = a.brier / a.n, ll = a.ll / a.n, hr = Math.round(a.hit / a.n * 100);
+    return `<tr><td>${idx === 0 ? '🏆 ' : ''}${nm}</td><td>${a.n}</td><td>${hr}%</td><td>${br.toFixed(3)}</td><td>${ll.toFixed(3)}</td></tr>`;
+  }).join('');
+  const calRows = cal.filter(c => c.n >= 3).map(c => {
+    const pr = c.pSum / c.n, ac = c.hit / c.n, d = ac - pr;
+    return `<tr><td>${Math.round(c.lo * 100)}–${Math.min(100, Math.round(c.hi * 100))}%</td><td>${c.n}</td><td>${Math.round(pr * 100)}%</td><td>${Math.round(ac * 100)}%</td><td style="color:${Math.abs(d) < 0.05 ? 'var(--green)' : 'var(--amber)'}">${d > 0 ? '+' : ''}${Math.round(d * 100)}</td></tr>`;
+  }).join('');
+  const small = games < 30;
+  box.innerHTML = `<div style="padding:2px">
+    <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
+      <div style="font-size:12px;color:var(--text2)">נמדדו</div>
+      <div style="font-size:24px;font-weight:800;color:var(--accent)">${games} משחקים · ${forms.length} טפסים</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">המדויק ביותר עד עכשיו: ${bestN}</div>
+      ${small ? '<div style="font-size:10px;color:var(--amber);margin-top:6px">⚠ עדיין מעט נתונים (מתחת ל-30 משחקים) — אל תסיק מסקנות חזקות</div>' : ''}
+    </div>
+    <div class="section-lbl">דיוק לפי מקור</div>
+    <div class="card"><table class="ms-tbl"><tr><th>מקור</th><th>משחקים</th><th>פגיעה</th><th>Brier</th><th>LogLoss</th></tr>${rows}</table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">פגיעה = כמה פעמים הפייבוריט של המקור ניצח. Brier ו-LogLoss מודדים עד כמה ההסתברויות עצמן מדויקות — <b>נמוך יותר = טוב יותר</b>. מקור יופיע רק למשחקים שנשמרו אחרי שהוא התווסף.</div></div>
+    ${calRows ? `<div class="section-lbl" style="margin-top:12px">כיול: האם ההסתברויות אמינות?</div>
+    <div class="card"><table class="ms-tbl"><tr><th>הסתברות</th><th>מקרים</th><th>צפוי</th><th>בפועל</th><th>הפרש</th></tr>${calRows}</table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">אם "בפועל" קרוב ל"צפוי" — היחס אמין.</div></div>` : ''}
+    <div class="section-lbl" style="margin-top:12px">Winner מול השוק</div>
+    <div class="card" style="font-size:12px;color:var(--text);line-height:1.9">
+      ${mN ? `מרווח ממוצע (overround): Winner <b>${(mW / mN * 100).toFixed(1)}%</b> · שוק <b>${(mM / mN * 100).toFixed(1)}%</b><br>` : ''}
+      ${favN ? `תשואה אילו היית משחק תמיד את הפייבוריט ב-Winner: <b style="color:${favRet >= 0 ? 'var(--green)' : 'var(--red)'}">${(favRet / favN * 100).toFixed(0)}%</b> (${favN} משחקים)<br>` : ''}
+      ${valN ? `משחקי "ערך" 💎 שסומנו: ${valN} · פגעו ${valHit} · תשואה <b style="color:${valRet >= 0 ? 'var(--green)' : 'var(--red)'}">${(valRet / valN * 100).toFixed(0)}%</b>` : '<span style="color:var(--text3)">עדיין אין משחקי ערך שנמדדו</span>'}
+    </div>
+    <div style="font-size:10px;color:var(--text3);text-align:center;margin-top:12px;line-height:1.6">המדידה היא על משחקים שנשמרו בטפסים עם יחסים. ככל שיצטברו עוד מחזורים, המסקנות יהיו אמינות יותר.</div>
+  </div>`;
+}
+
+function renderPerfMethods(box) {
   const measured = (APP.forms || []).filter(f => f.results && f.scores);
   if (!measured.length) {
     box.innerHTML = `<div style="padding:24px 20px;text-align:center">
@@ -2113,6 +2208,10 @@ function clearResults(formIdx) {
   showScreen('screen-history');
   renderHistory();
 }
+
+// עדכון שקט גם בפתיחת האפליקציה ובחזרה אליה
+window.addEventListener('load', () => setTimeout(() => { try { autoUpdateHistoryResults(); } catch (e) {} }, 3500));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(() => { try { autoUpdateHistoryResults(); } catch (e) {} }, 800); });
 
 // עדכון תוצאות אוטומטי ושקט בכניסה להיסטוריה (בלי כפתור)
 const _autoRes = { running: false, last: {} };
@@ -2824,6 +2923,34 @@ function toast(msg, type='d') {
 }
 
 
+
+// ===== עזרים: איכות נתונים, ערך מול שוק, תנועת יחסים =====
+function dataQuality(g) {
+  let sc = 0;
+  if (g.hasOdds) sc += 35;
+  sc += Math.min(3, g.oddsN || 0) * 15;               // עד 45 על מספר מקורות
+  if ((g.marketN || 0) > 0) sc += 10;                  // יש מקור עצמאי מ-Winner
+  if (g.oddsN > 1 && !(g.oddsSpread > 0.3)) sc += 10;  // המקורות מסכימים
+  return Math.min(100, sc);
+}
+function bestValue(g) {
+  if (!g.ev) return null;
+  let bk = null;
+  ['1', 'X', '2'].forEach(k => { if (bk === null || g.ev[k] > g.ev[bk]) bk = k; });
+  return { k: bk, ev: g.ev[bk] };
+}
+function trendInfo(g) {
+  if (!g.trend || !g.trend.first || !g.odds) return null;
+  let best = null;
+  ['1', 'X', '2'].forEach(k => {
+    const f = Number(g.trend.first[k]), c = Number(g.odds[k]);
+    if (!(f > 1) || !(c > 1)) return;
+    const pct = (c - f) / f;
+    if (best === null || Math.abs(pct) > Math.abs(best.pct)) best = { k, pct, from: f, to: c };
+  });
+  return best && Math.abs(best.pct) >= 0.04 ? best : null;
+}
+
 // ===== חלון פרטי משחק (לחיצה על שורה בטופס) =====
 APP._msCache = APP._msCache || {};
 function closeMatchSheet() { const o = document.getElementById('ms-ov'); if (o) o.classList.remove('open'); }
@@ -2854,6 +2981,17 @@ function openMatchSheet(i) {
   } else {
     oddsHtml = `<div class="ms-sec"><h4>יחסים</h4><div style="font-size:12px;color:var(--text3)">הליין טרם נפתח למשחק הזה</div></div>`;
   }
+  const bv = bestValue(g), tr = trendInfo(g), dq = dataQuality(g);
+  if (g.ev && g.winnerOdds && g.marketOdds) {
+    oddsHtml += `<div class="ms-sec"><h4>Winner מול השוק (ערך)</h4>
+      <table class="ms-tbl"><tr><th></th><th>1</th><th>X</th><th>2</th></tr>
+      <tr><td>Winner</td>${['1','X','2'].map(k => `<td>${g.winnerOdds[k]}</td>`).join('')}</tr>
+      <tr><td>שוק (${g.marketN} מקורות)</td>${['1','X','2'].map(k => `<td>${g.marketOdds[k]}</td>`).join('')}</tr>
+      <tr class="avg"><td>רווח צפוי</td>${['1','X','2'].map(k => `<td style="color:${g.ev[k] >= 0.02 ? 'var(--green)' : (g.ev[k] < -0.08 ? 'var(--red)' : 'var(--text2)')}">${g.ev[k] > 0 ? '+' : ''}${(g.ev[k] * 100).toFixed(1)}%</td>`).join('')}</tr></table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">${bv && bv.ev >= 0.02 ? '💎 ב-' + bv.k + ' Winner משלם יותר מהשוק' : 'רווח צפוי שלילי = Winner משלם פחות מהשוק (המרווח של Winner). ערך חיובי הוא נדיר.'}</div></div>`;
+  }
+  if (tr) oddsHtml += `<div class="ms-sec"><h4>תנועת יחסים</h4><div style="font-size:12px;color:var(--text)">יחס ${tr.k}: ${tr.from} ← ${tr.to} <b style="color:${tr.pct < 0 ? 'var(--green)' : 'var(--red)'}">${tr.pct < 0 ? '↓ ירד' : '↑ עלה'} ${Math.round(Math.abs(tr.pct) * 100)}%</b></div><div style="font-size:10px;color:var(--text3);margin-top:6px">ירידה ביחס = השוק מאמין יותר בתוצאה הזאת (${g.trend.snapshots} מדידות)</div></div>`;
+  oddsHtml += `<div style="font-size:10px;color:var(--text3);text-align:center;margin:-2px 0 10px">איכות נתונים: ${dq}/100 ${dq >= 80 ? '🟢' : dq >= 50 ? '🟡' : '🔴'}</div>`;
   const rec = g.pick && g.pick !== '?' ? `<div style="font-size:12px;color:var(--text2);margin-bottom:6px">המלצת האפליקציה: <b style="color:var(--accent)">${g.pick}</b>${g.confidence ? ' · ביטחון ' + g.confidence : ''}</div>` : '';
   const picks = `<div class="ms-sec"><h4>הבחירה שלך</h4>${rec}<div class="ms-picks">${['1', 'X', '2'].map(v => `<div class="${cur.includes(v) ? 'on' : ''}" onclick="${rein ? `setMark(${i},'${v}')` : `setPick(${i},'${v}')`};openMatchSheet(${i})">${v}</div>`).join('')}</div></div>`;
   box.innerHTML = `<div class="ms-h"><div><div class="ms-t">${g.home} - ${g.away}</div><div class="ms-s">${meta}</div></div><button class="ms-x" onclick="closeMatchSheet()">✕</button></div>
@@ -3729,6 +3867,7 @@ async function fetchAndStoreGames() {
     pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
     result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway,
     oddsN: g.oddsN || 0, oddsSources: g.oddsSources || [], oddsSpread: g.oddsSpread || 0,
+    winnerOdds: g.winnerOdds || null, marketOdds: g.marketOdds || null, marketN: g.marketN || 0, ev: g.ev || null, trend: g.trend || null,
     date: g.date || '', day: g.day || '', time: g.time || ''
   }));
   APP.programNumber = data.program || '';
