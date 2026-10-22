@@ -3342,7 +3342,7 @@ function toggleKeyVisibility() {
 
 // ===== טור מערכת: שוק נקי + Elo (מכל התוצאות ההיסטוריות) + כיול מטפסים קודמים =====
 let SYS_COLUMN = null;
-const SYS_W_DEFAULT = 0.25;
+const SYS_W_DEFAULT = 0.10;
 function sysNorm(p) { if (!p) return null; const t = (+p['1']||0) + (+p['X']||0) + (+p['2']||0); if (!(t > 0)) return null; return { '1': p['1']/t, 'X': p['X']/t, '2': p['2']/t }; }
 // לומד מהעבר: משקל Elo + תיקון כיול לפי דליים. ללא מספיק נתונים — ברירות מחדל זהירות.
 function sysLearn() {
@@ -3388,7 +3388,7 @@ function sysCompute(g, L) {
   if (!m && !e) return null;
   let p, w = 0;
   if (m && e) {
-    w = L.w * Math.min(1, eloN / 20);
+    w = L.w * Math.min(1, eloN / 30);
     p = { '1': (1-w)*m['1'] + w*e['1'], 'X': (1-w)*m['X'] + w*e['X'], '2': (1-w)*m['2'] + w*e['2'] };
   } else p = m || e;
   if (L.adj) {

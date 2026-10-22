@@ -1,6 +1,6 @@
 /* Winner אנליזר — Service Worker
    בכל עדכון: העלה את VERSION כדי שמשתמשים קיימים יקבלו את הגרסה החדשה אוטומטית. */
-const VERSION = 'v43-system';
+const VERSION = 'v44-system-w10';
 const CACHE = 'winner-cache-' + VERSION;
 const APP_SHELL = [
   './',
