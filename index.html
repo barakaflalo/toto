@@ -1105,7 +1105,7 @@ function _renderScreen(id) {
     nav.querySelectorAll('.bn-item').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   }
   closeMoreMenu();
-  if (id === 'screen-history') renderHistory();
+  if (id === 'screen-history') { renderHistory(); setTimeout(autoUpdateHistoryResults, 300); }
   if (id === 'screen-performance') renderPerformance();
   if (id === 'screen-home') { updateHomeStats(); updateHomeAIStatus(); }
   if (id === 'screen-match-analysis') {
@@ -1744,7 +1744,7 @@ function openUpdateResults(formIdx) {
         <div style="font-size:34px;margin-bottom:8px">🔄</div>
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">משיכת תוצאות אוטומטית</div>
         <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:14px">
-          האפליקציה תמשוך את התוצאות האמיתיות של המשחקים<br>ישירות מהמקור — לחיצה אחת
+          התוצאות מתעדכנות לבד כשנכנסים להיסטוריה.<br>אפשר גם למשוך ידנית כאן
         </div>
         <button class="btn-gold" id="fetch-results-btn" onclick="fetchResultsAuto(${formIdx})" style="width:100%;padding:12px">
           🏆 משוך תוצאות עכשיו
@@ -2044,9 +2044,9 @@ function manualResult(i, sign) {
   const saveBtn = document.getElementById('upd-save-btn'); if (saveBtn) saveBtn.classList.remove('disabled');
 }
 
-function saveResults(formIdx) {
+function saveResults(formIdx, silent) {
   const results = APP.pendingResults;
-  if (!results || !Object.keys(results).length) { toast('אין תוצאות לשמירה','e'); return; }
+  if (!results || !Object.keys(results).length) { if (!silent) toast('אין תוצאות לשמירה','e'); return; }
   const form = APP.forms[formIdx];
   form.results = results;
   ensureStrategies(form);
@@ -2072,10 +2072,71 @@ function saveResults(formIdx) {
   APP.forms[formIdx] = form;
   localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
   updateHomeStats();
+  if (silent) return;
   const mine = sc.manual;
   toast(mine ? ('✅ נשמר! צדקת ב-' + mine.correct + '/' + mine.total) : '✅ תוצאות נשמרו!', 's');
   showScreen('screen-history');
   renderHistory();
+}
+
+// עדכון תוצאות אוטומטי ושקט בכניסה להיסטוריה (בלי כפתור)
+const _autoRes = { running: false, last: {} };
+async function autoUpdateHistoryResults() {
+  if (_autoRes.running || !APP.forms || !APP.forms.length) return;
+  const todo = [];
+  APP.forms.forEach((f, i) => {
+    const have = f.results ? Object.keys(f.results).length : 0;
+    if (have < (f.games || []).length && Date.now() - (_autoRes.last[f.id || i] || 0) > 5 * 60 * 1000) todo.push(i);
+  });
+  if (!todo.length) return;
+  _autoRes.running = true;
+  let updated = 0;
+  try {
+    for (const idx of todo.slice(-6).reverse()) {
+      const form = APP.forms[idx];
+      _autoRes.last[form.id || idx] = Date.now();
+      try {
+        const results = { ...(form.results || {}) };
+        const before = Object.keys(results).length;
+        const prog = form.program ? ('&program=' + encodeURIComponent(form.program)) : '';
+        try {
+          const res = await fetch(CLOUDFLARE_WORKER_URL + '/?results=1' + prog + '&t=' + Date.now());
+          const data = res.ok ? await res.json() : null;
+          if (data && data.ok && data.games) {
+            const byNum = {};
+            data.games.forEach(x => { if (x.num != null) byNum[Number(x.num)] = x; });
+            form.games.forEach((g, i) => {
+              if (results[i]) return;
+              let m = byNum[i + 1];
+              if (m && !(nameSim(m.home, g.home) >= 0.5 && nameSim(m.away, g.away) >= 0.5)) m = null;
+              if (!m) m = data.games.find(x => sameGameFuzzy(x, g));
+              if (m && m.result) results[i] = m.result;
+            });
+          }
+        } catch (e) {}
+        const miss = form.games.map((g, i) => i).filter(i => !results[i]);
+        if (miss.length) {
+          try {
+            const r2 = await fetch(CLOUDFLARE_WORKER_URL + '/?formresults=1', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ since: form.id || 0, games: miss.map(i => ({ home: form.games[i].home, away: form.games[i].away })) })
+            });
+            const d2 = await r2.json();
+            if (d2 && d2.ok && Array.isArray(d2.results)) d2.results.forEach((x, k) => { if (x && x.result) results[miss[k]] = x.result; });
+          } catch (e) {}
+        }
+        if (Object.keys(results).length > before) {
+          APP.pendingResults = results;
+          saveResults(idx, true);
+          updated++;
+        }
+      } catch (e) {}
+    }
+  } finally { _autoRes.running = false; APP.pendingResults = null; }
+  if (updated) {
+    toast('🔄 עודכנו תוצאות ב-' + updated + ' טפסים', 's');
+    if (NAV.current === 'screen-history') renderHistory();
+  }
 }
 
 function reopenForm(i) {
