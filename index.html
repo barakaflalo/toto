@@ -1299,7 +1299,7 @@ function renderFormGames() {
     const conf = g.confidence || '';
     const confColor = conf==='גבוהה'?'var(--green)':conf==='בינונית'?'var(--amber)':'var(--text3)';
     const meta = [g.league, (g.day && g.time ? g.day + ' ' + g.time : '')].filter(Boolean).join(' · ');
-    const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` + (g.oddsN > 1 ? ` · ממוצע ${g.oddsN} מקורות` : (g.oddsN === 1 ? ' · מקור אחד' : '')) : '';
+    const oddsTxt = g.odds && g.hasOdds ? `${g.odds['1']} / ${g.odds['X']} / ${g.odds['2']}` + (g.oddsN > 1 ? ` · ממוצע ${g.oddsN} מקורות` + (g.oddsSpread > 0.3 ? ' ⚠ מקורות חלוקים' : '') : (g.oddsN === 1 ? ' · מקור אחד' : '')) : '';
     const noOdds = g.odds && !g.hasOdds;
     const recBadge = rec
       ? `<span style="font-size:9px;color:${confColor};white-space:nowrap">★ ${rec}${conf?' · '+conf:''}</span>`
