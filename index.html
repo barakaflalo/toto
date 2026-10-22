@@ -477,6 +477,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
     </div>
     <button id="ai-column-btn" onclick="generateAIColumn()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:1px solid var(--accent2);background:var(--accent-bg);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🤖 צור טור AI מבוסס נתונים</button>
     <div id="ai-column-result" style="margin-bottom:8px"></div>
+    <button id="sys-column-btn" onclick="generateSystemColumn()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">📐 צור טור מערכת (חישוב סטטיסטי)</button>
+    <div id="sys-column-result" style="margin-bottom:8px"></div>
     <button id="col-builder-btn" onclick="toggleColumnBuilder()" style="width:100%;padding:9px;margin-bottom:6px;border-radius:9px;border:0.5px solid var(--border2);background:var(--bg3);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🎟️ מחולל טורים לפי תקציב</button>
     <div id="column-builder" style="display:none;margin-bottom:8px"></div>
     <div id="form-games-list" style="display:flex;flex-direction:column;gap:5px"></div>
@@ -1493,6 +1495,17 @@ function analyzeForm() {
     strategies.reinforced = { ...APP.reinforcedColumn.marks };
   }
 
+  // טור מערכת: נוצר תמיד (גם אם לא לחצת) כדי שהמדידה תצטבר
+  let sysData = null;
+  try {
+    if (!SYS_COLUMN || String(SYS_COLUMN.program || '') !== String(APP.programNumber || '') || SYS_COLUMN.n !== APP.currentGames.length) buildSystemColumn(3, 1);
+    if (SYS_COLUMN) {
+      strategies.system = { ...SYS_COLUMN.picks };
+      strategies.systemReinforced = { ...SYS_COLUMN.marks };
+      sysData = SYS_COLUMN.comps;
+    }
+  } catch (e) { console.warn('system column', e); }
+
   const form = {
     id: Date.now(),
     date: new Date().toLocaleDateString('he-IL'),
@@ -1507,6 +1520,7 @@ function analyzeForm() {
     score: null
   };
   if (aiPredictionData) form.aiPrediction = aiPredictionData;
+  if (sysData) form.sysData = sysData;
   APP.forms.push(form);
   localStorage.setItem('winner-forms', JSON.stringify(APP.forms));
   updateHomeStats();
@@ -1556,6 +1570,9 @@ function renderPerfSources(box) {
       ['1', 'X', '2'].forEach(k => { const c = cal.find(b => pc[k] >= b.lo && pc[k] < b.hi); if (c) { c.n++; c.pSum += pc[k]; if (k === res) c.hit++; } });
     }
     (g.oddsSources || []).forEach(src => add(src.name, oddsObjProbs(src.odds), res));
+    if (g.sys && g.sys.market) add('שוק נקי (בלי מרווח הבוקי)', g.sys.market, res);
+    if (g.sys && g.sys.elo) add('Elo (דירוג מכל התוצאות)', g.sys.elo, res);
+    if (f.sysData && f.sysData[i] && f.sysData[i].p) add('📐 טור מערכת (משולב + כיול)', f.sysData[i].p, res);
     if (g.marketOdds) add('שוק (DraftKings + Betexplorer)', oddsObjProbs(g.marketOdds), res);
     if (g.winnerOdds) {
       add('Winner בלבד (בנקרים/365)', oddsObjProbs(g.winnerOdds), res);
@@ -1835,6 +1852,8 @@ function renderAllStrategyRows(f) {
   html += makeRow('🤖 טור AI', S.ai, sc.ai);
   html += makeRow('🤖 AI מחוזק', S.aiReinforced, sc.aiReinforced);
   html += makeRow('🎟️ טור מחוזק', S.reinforced, sc.reinforced);
+  html += makeRow('📐 טור מערכת', S.system, sc.system);
+  html += makeRow('📐 מערכת מחוזק', S.systemReinforced, sc.systemReinforced);
   html += makeRow('✓ הבחירות שלך', f.manual || f.picks, sc.manual);
   html += makeRow('🎯 פייבוריט (בנצ׳מרק)', favoritePicks(f.games), sc.favorite);
   if (results) html += '<div style="font-size:9px;color:var(--text3);text-align:center;margin-top:4px">מסגרת ירוקה = ניחוש נכון</div>';
@@ -2061,6 +2080,8 @@ function computeFormScores(form, results) {
     ai: form.strategies?.ai,
     aiReinforced: form.strategies?.aiReinforced,
     reinforced: form.strategies?.reinforced,
+    system: form.strategies?.system,
+    systemReinforced: form.strategies?.systemReinforced,
     manual: form.manual || form.picks,
     favorite: favoritePicks(form.games),   // בנצ'מרק — פייבוריט בלבד
   };
@@ -2086,6 +2107,8 @@ const METHOD_META = {
   ai:           { label: '🤖 טור AI',       picks: f => f.strategies?.ai },
   aiReinforced: { label: '🤖 AI מחוזק',     picks: f => f.strategies?.aiReinforced },
   reinforced:   { label: '🎟️ טור מחוזק',    picks: f => f.strategies?.reinforced },
+  system:       { label: '📐 טור מערכת',    picks: f => f.strategies?.system },
+  systemReinforced: { label: '📐 מערכת מחוזק', picks: f => f.strategies?.systemReinforced },
   manual:       { label: '✓ הבחירות שלך',   picks: f => (f.manual || f.picks) },
   favorite:     { label: '🎯 פייבוריט (בנצ׳מרק)', picks: f => favoritePicks(f.games) },
 };
@@ -3316,6 +3339,142 @@ function toggleKeyVisibility() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+
+// ===== טור מערכת: שוק נקי + Elo (מכל התוצאות ההיסטוריות) + כיול מטפסים קודמים =====
+let SYS_COLUMN = null;
+const SYS_W_DEFAULT = 0.25;
+function sysNorm(p) { if (!p) return null; const t = (+p['1']||0) + (+p['X']||0) + (+p['2']||0); if (!(t > 0)) return null; return { '1': p['1']/t, 'X': p['X']/t, '2': p['2']/t }; }
+// לומד מהעבר: משקל Elo + תיקון כיול לפי דליים. ללא מספיק נתונים — ברירות מחדל זהירות.
+function sysLearn() {
+  const rows = [];
+  (APP.forms || []).forEach(f => {
+    if (!f.results) return;
+    (f.games || []).forEach((g, i) => {
+      const res = f.results[i]; if (!res) return;
+      const m = sysNorm(g.sys && g.sys.market) || (g.hasOdds ? oddsObjProbs(g.odds) : null);
+      if (!m) return;
+      rows.push({ m, e: g.sys && g.sys.elo ? sysNorm(g.sys.elo) : null, res });
+    });
+  });
+  const L = { w: SYS_W_DEFAULT, n: rows.length, nElo: 0, adj: null };
+  const withElo = rows.filter(r => r.e);
+  L.nElo = withElo.length;
+  const brier = (p, res) => ['1','X','2'].reduce((t, k) => t + Math.pow(p[k] - (k === res ? 1 : 0), 2), 0);
+  if (withElo.length >= 40) {
+    let best = SYS_W_DEFAULT, bs = 1e9;
+    for (let w = 0; w <= 0.6001; w += 0.05) {
+      const sc = withElo.reduce((t, r) => t + brier(sysNorm({ '1': (1-w)*r.m['1'] + w*r.e['1'], 'X': (1-w)*r.m['X'] + w*r.e['X'], '2': (1-w)*r.m['2'] + w*r.e['2'] }), r.res), 0) / withElo.length;
+      if (sc < bs) { bs = sc; best = w; }
+    }
+    const k = withElo.length / (withElo.length + 60);       // כיווץ לכיוון ברירת המחדל
+    L.w = Math.round(((1 - k) * SYS_W_DEFAULT + k * best) * 100) / 100;
+  }
+  if (rows.length >= 60) {
+    const edges = [0, .25, .4, .55, 1.01];
+    L.adj = edges.slice(0, -1).map((lo, bi) => {
+      const hi = edges[bi + 1]; let n = 0, ps = 0, hit = 0;
+      rows.forEach(r => ['1','X','2'].forEach(kk => { const p = r.m[kk]; if (p >= lo && p < hi) { n++; ps += p; if (kk === r.res) hit++; } }));
+      if (n < 40) return { lo, hi, d: 0, n };
+      const d = (hit / n - ps / n) * (n / (n + 60));
+      return { lo, hi, d: Math.max(-0.05, Math.min(0.05, d)), n };
+    });
+  }
+  return L;
+}
+function sysCompute(g, L) {
+  const m = sysNorm(g.sys && g.sys.market) || (g.hasOdds ? oddsObjProbs(g.odds) : null);
+  const e = g.sys && g.sys.elo ? sysNorm(g.sys.elo) : null;
+  const eloN = (g.sys && g.sys.eloN) || 0;
+  if (!m && !e) return null;
+  let p, w = 0;
+  if (m && e) {
+    w = L.w * Math.min(1, eloN / 20);
+    p = { '1': (1-w)*m['1'] + w*e['1'], 'X': (1-w)*m['X'] + w*e['X'], '2': (1-w)*m['2'] + w*e['2'] };
+  } else p = m || e;
+  if (L.adj) {
+    const q = {};
+    ['1','X','2'].forEach(k => { const b = L.adj.find(x => p[k] >= x.lo && p[k] < x.hi); q[k] = Math.max(0.02, p[k] + (b ? b.d : 0)); });
+    p = q;
+  }
+  p = sysNorm(p);
+  return { p, m, e, w: Math.round(w * 100) / 100, eloN };
+}
+function sysMarks(p, t) {
+  const order = ['1','X','2'].sort((a, b) => p[b] - p[a]);
+  if (t === 'triple') return ['1','X','2'];
+  if (t === 'double') return order.slice(0, 2);
+  return [order[0]];
+}
+// בונה טור מערכת רגיל + מחוזק (כפולים/משולשים במשחקים הצמודים ביותר לפי ההסתברויות של המערכת)
+function buildSystemColumn(wantD, wantT) {
+  const games = APP.currentGames || [];
+  const L = sysLearn();
+  const comps = {}, picks = {}, marks = {}, type = {};
+  const unc = [];
+  games.forEach((g, i) => {
+    const c = sysCompute(g, L);
+    type[i] = 'single';
+    if (!c) { const fp = favoritePicks(games)[i]; if (fp) { picks[i] = fp; marks[i] = [fp]; } return; }
+    const order = ['1','X','2'].sort((a, b) => c.p[b] - c.p[a]);
+    picks[i] = order[0];
+    comps[i] = { p: c.p, m: c.m, e: c.e, w: c.w };
+    unc.push({ i, u: 1 - (c.p[order[0]] - c.p[order[1]]) });
+  });
+  unc.sort((a, b) => b.u - a.u);
+  let pos = 0;
+  for (let k = 0; k < wantT && pos < unc.length; k++, pos++) type[unc[pos].i] = 'triple';
+  for (let k = 0; k < wantD && pos < unc.length; k++, pos++) type[unc[pos].i] = 'double';
+  games.forEach((g, i) => { if (comps[i]) marks[i] = sysMarks(comps[i].p, type[i]); });
+  SYS_COLUMN = { picks, marks, type, comps, learn: { w: L.w, n: L.n, nElo: L.nElo, cal: !!L.adj }, program: APP.programNumber || '', n: games.length, wantD, wantT };
+  return SYS_COLUMN;
+}
+function generateSystemColumn() {
+  if (!APP.currentGames || !APP.currentGames.length) { toast('טען קודם את משחקי השבוע', 'i'); return; }
+  const wantD = Math.max(0, Math.min(16, Number(document.getElementById('ai-doubles')?.value) || 0));
+  const wantT = Math.max(0, Math.min(16, Number(document.getElementById('ai-triples')?.value) || 0));
+  buildSystemColumn(wantD, wantT);
+  renderSystemColumn();
+}
+function renderSystemColumn() {
+  const box = document.getElementById('sys-column-result'); if (!box || !SYS_COLUMN) return;
+  const pc = v => v==='1'?'var(--green)':v==='X'?'var(--amber)':v==='2'?'var(--red)':'var(--text3)';
+  const pb = v => v==='1'?'var(--green-bg)':v==='X'?'var(--amber-bg)':v==='2'?'var(--red-bg)':'var(--bg3)';
+  const S = SYS_COLUMN;
+  let rows = '';
+  APP.currentGames.forEach((g, i) => {
+    const c = S.comps[i]; const marks = S.marks[i] || [];
+    const t = S.type[i];
+    const tb = t === 'triple' ? '<span style="color:var(--red);font-size:8px;font-weight:700">3×</span>' : t === 'double' ? '<span style="color:var(--amber);font-size:8px;font-weight:700">2×</span>' : '';
+    const pct = c ? ['1','X','2'].map(k => `<span style="color:${pc(k)}">${k} ${Math.round(c.p[k]*100)}%</span>`).join(' · ') : 'אין נתונים — פייבוריט';
+    const src = c ? (c.e ? (c.m ? 'שוק+Elo' : 'Elo בלבד') : 'שוק בלבד') : '';
+    rows += `<div style="padding:7px 8px;background:var(--bg2);border-radius:8px;margin-bottom:4px"><div style="display:flex;align-items:center;gap:8px">
+      <div style="font-size:10px;color:var(--text3);width:16px">${i+1}</div>
+      <div style="flex:1;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.home} - ${g.away}</div>
+      ${tb}<div style="display:flex;gap:2px">${marks.map(m => `<div style="width:20px;height:22px;border-radius:5px;background:${pb(m)};color:${pc(m)};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">${m}</div>`).join('')}</div>
+      </div><div style="font-size:9px;color:var(--text3);margin-top:3px;margin-right:24px">${pct} <span style="opacity:.7">· ${src}</span></div></div>`;
+  });
+  const cols = Math.pow(2, Object.values(S.type).filter(x => x === 'double').length) * Math.pow(3, Object.values(S.type).filter(x => x === 'triple').length);
+  const lr = S.learn;
+  box.innerHTML = `<div class="card" style="border-color:var(--green)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:12px;font-weight:700;color:var(--green)">📐 טור מערכת · מחוזק: ${cols} טורים</div>
+      <div style="font-size:9px;color:var(--text3)">שוק נקי + Elo</div></div>
+    <div style="font-size:10px;color:var(--text2);line-height:1.6;margin-bottom:8px">משקל Elo: ${Math.round(lr.w*100)}% ${lr.nElo >= 40 ? '(נלמד מ-' + lr.nElo + ' משחקים)' : '(ברירת מחדל — עוד לא מספיק נתונים ללמידה)'} · כיול מטפסים קודמים: ${lr.cal ? 'פעיל' : 'עדיין לא (צריך 60+ משחקים עם תוצאות)'}</div>
+    ${rows}
+    <div style="display:flex;gap:6px;margin-top:8px">
+      <button onclick="applySystemColumn(false)" style="flex:1;padding:10px;border-radius:9px;border:1px solid var(--green);background:var(--green-bg);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">✓ החל טור רגיל</button>
+      <button onclick="applySystemColumn(true)" class="btn-gold" style="flex:1;padding:10px">💾 החל ושמור</button>
+    </div></div>`;
+}
+function applySystemColumn(save) {
+  if (!SYS_COLUMN) { toast('צור טור מערכת קודם', 'i'); return; }
+  APP.currentPicks = Object.assign({}, APP.currentPicks, SYS_COLUMN.picks);
+  if (formIsReinMode()) APP.reinforcedColumn = { picks: { ...SYS_COLUMN.picks }, marks: { ...SYS_COLUMN.marks }, type: { ...SYS_COLUMN.type }, program: APP.programNumber || '' };
+  renderFormGames();
+  if (save) { APP.currentGames.forEach((g, i) => { if (!APP.currentPicks[i]) APP.currentPicks[i] = 'X'; }); renderFormGames(); analyzeForm(); return; }
+  toast('✅ הוחל טור המערכת · אפשר לשמור למטה', 's');
+}
+
 // ===== מחולל טורים לפי מספר כפולים/משולשים =====
 let COL_STATE = null; // {type:{i:'single'|'double'|'triple'}, wantD, wantT}
 
@@ -3874,7 +4033,7 @@ async function fetchAndStoreGames() {
     pick: g.pick, confidence: g.confidence, hasOdds: g.hasOdds,
     result: g.result || null, scoreHome: g.scoreHome, scoreAway: g.scoreAway,
     oddsN: g.oddsN || 0, oddsSources: g.oddsSources || [], oddsSpread: g.oddsSpread || 0,
-    winnerOdds: g.winnerOdds || null, marketOdds: g.marketOdds || null, marketN: g.marketN || 0, ev: g.ev || null, trend: g.trend || null,
+    winnerOdds: g.winnerOdds || null, marketOdds: g.marketOdds || null, marketN: g.marketN || 0, ev: g.ev || null, trend: g.trend || null, sys: g.sys || null,
     date: g.date || '', day: g.day || '', time: g.time || ''
   }));
   APP.programNumber = data.program || '';
