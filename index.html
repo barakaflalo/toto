@@ -1579,12 +1579,14 @@ function renderPerfSources(box) {
   const bestN = names[0];
   const rows = names.map((nm, idx) => {
     const a = acc[nm], br = a.brier / a.n, ll = a.ll / a.n, hr = Math.round(a.hit / a.n * 100);
-    return `<tr><td>${idx === 0 ? '🏆 ' : ''}${nm}</td><td>${a.n}</td><td>${hr}%</td><td>${br.toFixed(3)}</td><td>${ll.toFixed(3)}</td></tr>`;
+    return `<tr><td>${idx === 0 ? '🏆 ' : ''}${nm}</td><td>${a.n}</td><td>${hr}%</td><td>${br.toFixed(3)}</td></tr>`;
   }).join('');
   const calRows = cal.filter(c => c.n >= 3).map(c => {
     const pr = c.pSum / c.n, ac = c.hit / c.n, d = ac - pr;
-    return `<tr><td>${Math.round(c.lo * 100)}–${Math.min(100, Math.round(c.hi * 100))}%</td><td>${c.n}</td><td>${Math.round(pr * 100)}%</td><td>${Math.round(ac * 100)}%</td><td style="color:${Math.abs(d) < 0.05 ? 'var(--green)' : 'var(--amber)'}">${d > 0 ? '+' : ''}${Math.round(d * 100)}</td></tr>`;
+    return `<tr><td>${Math.round(c.lo * 100)}% עד ${Math.min(100, Math.round(c.hi * 100))}%</td><td>${c.n}</td><td>${Math.round(pr * 100)}%</td><td>${Math.round(ac * 100)}%</td><td style="color:${Math.abs(d) < 0.05 ? 'var(--green)' : 'var(--amber)'}">${d > 0 ? '+' : ''}${Math.round(d * 100)}</td></tr>`;
   }).join('');
+  const bb = acc[bestN].brier / acc[bestN].n;
+  const verdict = bb < 0.58 ? 'הציון שלך טוב מאוד.' : bb < 0.62 ? 'הציון שלך טוב.' : bb < 0.65 ? 'הציון סביר, קצת יותר טוב מניחוש.' : 'הציון שלך (' + bb.toFixed(3) + ') קרוב לניחוש אקראי — כלומר המשחקים בטופס קשים לחיזוי, והיחסים בלבד לא מספיקים כדי לצפות בביטחון תוצאה.';
   const small = games < 30;
   box.innerHTML = `<div style="padding:2px">
     <div style="background:var(--accent-bg);border:1px solid var(--accent2);border-radius:12px;padding:14px;margin-bottom:12px;text-align:center">
@@ -1593,12 +1595,17 @@ function renderPerfSources(box) {
       <div style="font-size:11px;color:var(--text3);margin-top:3px">המדויק ביותר עד עכשיו: ${bestN}</div>
       ${small ? '<div style="font-size:10px;color:var(--amber);margin-top:6px">⚠ עדיין מעט נתונים (מתחת ל-30 משחקים) — אל תסיק מסקנות חזקות</div>' : ''}
     </div>
+    <div class="card" style="margin-bottom:12px;font-size:12px;line-height:1.8;color:var(--text2)">
+      <b style="color:var(--text)">מה רואים כאן?</b><br>
+      כל יחס הימורים הוא גם הערכה של סיכוי. כאן בודקים אחרי המשחקים: האם הסיכויים שהאפליקציה הציגה (מהיחסים) התאימו למה שקרה בפועל.<br>
+      <b style="color:var(--text)">ציון הדיוק:</b> 0.667 = כמו ניחוש אקראי (שליש לכל תוצאה). 0 = מושלם. ${verdict}
+    </div>
     <div class="section-lbl">דיוק לפי מקור</div>
-    <div class="card"><table class="ms-tbl"><tr><th>מקור</th><th>משחקים</th><th>פגיעה</th><th>Brier</th><th>LogLoss</th></tr>${rows}</table>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">פגיעה = כמה פעמים הפייבוריט של המקור ניצח. Brier ו-LogLoss מודדים עד כמה ההסתברויות עצמן מדויקות — <b>נמוך יותר = טוב יותר</b>. מקור יופיע רק למשחקים שנשמרו אחרי שהוא התווסף.</div></div>
+    <div class="card"><table class="ms-tbl"><tr><th>מקור</th><th>משחקים</th><th>הפייבוריט ניצח</th><th>ציון דיוק (נמוך=טוב)</th></tr>${rows}</table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px;line-height:1.6">"הפייבוריט ניצח" = באיזה אחוז מהמשחקים התוצאה עם היחס הנמוך אכן קרתה. כרגע רואים רק "יחס משולב" כי טפסים ישנים לא שמרו את המקורות. כל מקור ייכנס לטבלה במשחקים שיישמרו מעכשיו.</div></div>
     ${calRows ? `<div class="section-lbl" style="margin-top:12px">כיול: האם ההסתברויות אמינות?</div>
-    <div class="card"><table class="ms-tbl"><tr><th>הסתברות</th><th>מקרים</th><th>צפוי</th><th>בפועל</th><th>הפרש</th></tr>${calRows}</table>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px">אם "בפועל" קרוב ל"צפוי" — היחס אמין.</div></div>` : ''}
+    <div class="card"><table class="ms-tbl"><tr><th>האפליקציה אמרה</th><th>מקרים</th><th>ממוצע שאמרה</th><th>קרה בפועל</th><th>פער</th></tr>${calRows}</table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">אם "קרה בפועל" קרוב ל"ממוצע שאמרה" — ההסתברויות אמינות. פער חיובי = זה קורה יותר ממה שחשבנו; שלילי = פחות. בקבוצות עם מעט מקרים (מתחת ל-30) הפער עלול להיות מקרי.</div></div>` : ''}
     <div class="section-lbl" style="margin-top:12px">Winner מול השוק</div>
     <div class="card" style="font-size:12px;color:var(--text);line-height:1.9">
       ${mN ? `מרווח ממוצע (overround): Winner <b>${(mW / mN * 100).toFixed(1)}%</b> · שוק <b>${(mM / mN * 100).toFixed(1)}%</b><br>` : ''}
